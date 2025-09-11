@@ -65,229 +65,156 @@ export default function VerificationResult() {
   const result = generateVerificationResult(data);
 
   return (
-    <div className="min-h-screen bg-gradient-background p-6">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Button
-            variant="outline"
-            onClick={() => navigate("/verify")}
-            className="border-border/50 hover:bg-muted/20"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Verification
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Verification Result</h1>
-            <p className="text-muted-foreground">Certificate verification completed</p>
-          </div>
-        </div>
-
-        {/* Result Status */}
-        <Card className="bg-card/95 backdrop-blur-sm border-border/50 shadow-card">
-          <CardHeader className="text-center pb-4">
-            <div className="flex items-center justify-center mb-4">
+    <div className="min-h-screen bg-gradient-background p-6 flex items-center justify-center">
+      <div className="w-full max-w-2xl mx-auto">
+        {/* Main Result Card */}
+        <Card className={`bg-card/95 backdrop-blur-sm shadow-card text-center transition-all duration-500 ${
+          result.status === "valid" 
+            ? "border-green-500/50 shadow-green-500/20 shadow-2xl" 
+            : "border-red-500/50 shadow-red-500/20 shadow-2xl"
+        }`}>
+          <CardContent className="p-12 space-y-8">
+            {/* Status Icon & Message */}
+            <div className="space-y-6">
               {result.status === "valid" ? (
-                <div className="p-4 rounded-full bg-green-500/20 border-2 border-green-500/30">
-                  <CheckCircle2 className="h-12 w-12 text-green-400" />
-                </div>
-              ) : (
-                <div className="p-4 rounded-full bg-red-500/20 border-2 border-red-500/30">
-                  <XCircle className="h-12 w-12 text-red-400" />
-                </div>
-              )}
-            </div>
-            <CardTitle className="text-2xl">
-              {result.status === "valid" ? "Certificate Verified ✓" : "Verification Failed"}
-            </CardTitle>
-            <CardDescription className="text-base">
-              {result.status === "valid" 
-                ? "This certificate is authentic and valid"
-                : "Unable to verify this certificate"
-              }
-            </CardDescription>
-          </CardHeader>
-        </Card>
-
-        {result.status === "valid" ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Certificate Details */}
-            <div className="lg:col-span-2 space-y-6">
-              <Card className="bg-card/95 backdrop-blur-sm border-green-500/20 shadow-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Award className="h-5 w-5 text-green-400" />
-                    Certificate Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">Student Name</label>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-primary" />
-                        <span className="font-semibold text-foreground">{result.certificate.studentName}</span>
+                <>
+                  <div className="flex justify-center">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-green-500/20 rounded-full blur-xl animate-pulse"></div>
+                      <div className="relative p-6 rounded-full bg-green-500/20 border-2 border-green-500/50">
+                        <CheckCircle2 className="h-24 w-24 text-green-400" />
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">Roll Number</label>
-                      <span className="font-mono text-primary font-medium">{result.certificate.rollNo}</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">Course</label>
-                      <div className="flex items-center gap-2">
-                        <GraduationCap className="h-4 w-4 text-primary" />
-                        <span className="font-medium text-foreground">{result.certificate.course}</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">Institution</label>
-                      <span className="font-medium text-foreground">{result.certificate.institution}</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">Issue Date</label>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-primary" />
-                        <span className="font-medium text-foreground">{result.certificate.issueDate}</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">Grade</label>
-                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30 font-bold">
-                        {result.certificate.marks}% - Grade {result.certificate.grade}
-                      </Badge>
                     </div>
                   </div>
+                  <div className="space-y-2">
+                    <h1 className="text-4xl font-bold text-green-400">Certificate Verified Successfully</h1>
+                    <p className="text-lg text-muted-foreground">This certificate is authentic and valid</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-center">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-red-500/20 rounded-full blur-xl animate-pulse"></div>
+                      <div className="relative p-6 rounded-full bg-red-500/20 border-2 border-red-500/50">
+                        <XCircle className="h-24 w-24 text-red-400" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h1 className="text-4xl font-bold text-red-400">Certificate Not Found / Invalid</h1>
+                    <p className="text-lg text-muted-foreground">Unable to verify this certificate</p>
+                  </div>
+                </>
+              )}
+            </div>
 
-                  <div className="space-y-2 pt-4 border-t border-border/30">
-                    <label className="text-sm font-medium text-muted-foreground">Certificate ID</label>
-                    <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
-                      <code className="text-sm font-mono text-primary break-all">
+            {/* Certificate Details */}
+            {result.status === "valid" ? (
+              <div className="space-y-6 pt-8 border-t border-border/30">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                      Certificate ID
+                    </label>
+                    <div className="p-4 rounded-lg bg-muted/20 border border-border/30">
+                      <code className="text-lg font-mono font-bold text-primary break-all">
                         {result.certificate.id}
                       </code>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">Blockchain Hash</label>
-                    <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
-                      <code className="text-xs font-mono text-muted-foreground break-all">
-                        {result.certificate.blockchainHash}
+                    <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                      Blockchain Hash
+                    </label>
+                    <div className="p-4 rounded-lg bg-muted/20 border border-border/30">
+                      <code className="text-sm font-mono text-muted-foreground break-all">
+                        {result.certificate.blockchainHash.substring(0, 16)}...
                       </code>
                     </div>
                   </div>
 
-                  <div className="flex gap-3 pt-4">
-                    <Button className="bg-green-600 hover:bg-green-700 text-white">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Report
-                    </Button>
-                    <Button variant="outline" className="border-border/50 hover:bg-muted/20">
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      View on Blockchain
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Verification Details */}
-            <div className="space-y-6">
-              <Card className="bg-card/95 backdrop-blur-sm border-blue-500/20 shadow-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-blue-400" />
-                    Verification Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-sm text-muted-foreground">Method</label>
-                      <p className="font-medium text-foreground">{result.verificationDetails.method}</p>
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm text-muted-foreground">Network</label>
-                      <p className="font-medium text-foreground">{result.verificationDetails.blockchainNetwork}</p>
-                    </div>
-
-                    <div>
-                      <label className="text-sm text-muted-foreground">Confirmations</label>
-                      <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
-                        {result.verificationDetails.confirmations}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                      Status
+                    </label>
+                    <div className="p-4 rounded-lg bg-muted/20 border border-border/30">
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30 font-bold text-lg px-4 py-2">
+                        ✅ VERIFIED
                       </Badge>
                     </div>
-
-                    <div>
-                      <label className="text-sm text-muted-foreground">Verified At</label>
-                      <p className="text-sm font-mono text-foreground">
-                        {new Date(result.verificationDetails.verifiedAt).toLocaleString()}
-                      </p>
-                    </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
 
-              <Card className="bg-card/95 backdrop-blur-sm border-border/50 shadow-card">
-                <CardHeader>
-                  <CardTitle className="text-lg">Trust Score</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center space-y-2">
-                    <div className="text-3xl font-bold text-green-400">98%</div>
-                    <div className="text-sm text-muted-foreground">Highly Trusted</div>
-                    <div className="w-full bg-muted/20 rounded-full h-2">
-                      <div className="bg-gradient-to-r from-green-500 to-blue-500 h-2 rounded-full" style={{width: "98%"}}></div>
-                    </div>
+                {/* Additional Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                      Student Name
+                    </label>
+                    <p className="text-xl font-semibold text-foreground">{result.certificate.studentName}</p>
                   </div>
-                </CardContent>
-              </Card>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                      Course
+                    </label>
+                    <p className="text-xl font-semibold text-foreground">{result.certificate.course}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6 pt-8 border-t border-border/30">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                    Certificate ID
+                  </label>
+                  <div className="p-4 rounded-lg bg-muted/20 border border-red-500/30">
+                    <code className="text-lg font-mono font-bold text-red-400 break-all">
+                      {data.method === "Certificate ID" ? data.input : "Not Found"}
+                    </code>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                    Status
+                  </label>
+                  <div className="p-4 rounded-lg bg-muted/20 border border-red-500/30">
+                    <Badge className="bg-red-500/20 text-red-400 border-red-500/30 font-bold text-lg px-4 py-2">
+                      ❌ INVALID
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <p className="text-red-400 font-medium">Error: {result.error.message}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Back Button */}
+            <div className="pt-8">
+              <Button
+                onClick={() => navigate("/verify")}
+                variant="outline"
+                size="lg"
+                className="border-primary/50 hover:bg-primary/10 hover:border-primary text-primary font-semibold px-8 py-3 transition-all duration-300"
+              >
+                <ArrowLeft className="h-5 w-5 mr-2" />
+                Back to Verify
+              </Button>
             </div>
-          </div>
-        ) : (
-          // Error State
-          <Card className="bg-card/95 backdrop-blur-sm border-red-500/20 shadow-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-400">
-                <XCircle className="h-5 w-5" />
-                Verification Failed
-              </CardTitle>
-              <CardDescription>
-                Error Code: {result.error.code}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-foreground">{result.error.message}</p>
-              
-              <div className="space-y-2">
-                <h4 className="font-medium text-foreground">Possible reasons:</h4>
-                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                  {result.error.possibleReasons.map((reason, index) => (
-                    <li key={index}>{reason}</li>
-                  ))}
-                </ul>
-              </div>
+          </CardContent>
+        </Card>
 
-              <div className="flex gap-3 pt-4">
-                <Button 
-                  onClick={() => navigate("/verify")}
-                  className="bg-primary hover:bg-primary/90"
-                >
-                  Try Again
-                </Button>
-                <Button variant="outline" className="border-border/50 hover:bg-muted/20">
-                  Contact Support
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Footer */}
+        <div className="text-center mt-8">
+          <p className="text-sm text-muted-foreground">
+            Verification powered by blockchain technology
+          </p>
+        </div>
       </div>
     </div>
   );
