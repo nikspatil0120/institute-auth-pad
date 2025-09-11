@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,8 @@ interface MessageState {
 }
 
 export default function AuthForm() {
+  const navigate = useNavigate();
+  const API_BASE_URL = "http://localhost:5000/api";
   const [loginForm, setLoginForm] = useState<Pick<FormState, 'email' | 'password'>>({
     email: '',
     password: '',
@@ -40,15 +43,24 @@ export default function AuthForm() {
     setLoading(true);
     setMessage({ type: null, text: '' });
 
-    // Simulate API call
-    setTimeout(() => {
-      if (loginForm.email && loginForm.password) {
-        setMessage({ type: 'success', text: 'Login successful! Redirecting...' });
-      } else {
-        setMessage({ type: 'error', text: 'Please fill in all fields.' });
+    try {
+      const res = await fetch(`${API_BASE_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginForm.email, password: loginForm.password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed');
       }
+      localStorage.setItem('auth_token', data.token);
+      setMessage({ type: 'success', text: 'Login successful! Redirecting...' });
+      navigate('/upload');
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Login failed' });
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -56,18 +68,34 @@ export default function AuthForm() {
     setLoading(true);
     setMessage({ type: null, text: '' });
 
-    // Simulate API call
-    setTimeout(() => {
-      if (!registerForm.instituteName || !registerForm.email || !registerForm.password || !registerForm.confirmPassword) {
-        setMessage({ type: 'error', text: 'Please fill in all fields.' });
-      } else if (registerForm.password !== registerForm.confirmPassword) {
-        setMessage({ type: 'error', text: 'Passwords do not match.' });
-      } else {
-        setMessage({ type: 'success', text: 'Registration successful! Please check your email.' });
-        setRegisterForm({ email: '', password: '', confirmPassword: '', instituteName: '' });
-      }
+    if (!registerForm.instituteName || !registerForm.email || !registerForm.password || !registerForm.confirmPassword) {
+      setMessage({ type: 'error', text: 'Please fill in all fields.' });
       setLoading(false);
-    }, 1500);
+      return;
+    }
+    if (registerForm.password !== registerForm.confirmPassword) {
+      setMessage({ type: 'error', text: 'Passwords do not match.' });
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: registerForm.instituteName, email: registerForm.email, password: registerForm.password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
+      setMessage({ type: 'success', text: 'Registration successful! You can sign in now.' });
+      setRegisterForm({ email: '', password: '', confirmPassword: '', instituteName: '' });
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Registration failed' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -142,10 +170,6 @@ export default function AuthForm() {
                       type="submit" 
                       className="w-full bg-gradient-primary hover:shadow-glow transition-all duration-300 disabled:opacity-50"
                       disabled={loading}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        window.location.href = '/students';
-                      }}
                     >
                       {loading ? 'Signing in...' : 'Sign In'}
                     </Button>

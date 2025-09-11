@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Upload, Plus, Edit2, Trash2, Users, FileSpreadsheet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import Navigation from "@/components/Navigation";
+import DemoModeBanner from "@/components/DemoModeBanner";
 
 interface Student {
   id: string;
@@ -13,8 +15,6 @@ interface Student {
   name: string;
   course: string;
   year: string;
-  marks: number;
-  certificateId: string;
 }
 
 interface StudentForm {
@@ -22,47 +22,56 @@ interface StudentForm {
   name: string;
   course: string;
   year: string;
-  marks: string;
 }
 
 export default function StudentManagement() {
   const { toast } = useToast();
-  const [students, setStudents] = useState<Student[]>([
-    {
-      id: "1",
-      rollNo: "CS001",
-      name: "John Doe",
-      course: "Computer Science",
-      year: "2024",
-      marks: 85,
-      certificateId: "CERT001"
-    },
-    {
-      id: "2",
-      rollNo: "EE002",
-      name: "Jane Smith",
-      course: "Electrical Engineering",
-      year: "2023",
-      marks: 92,
-      certificateId: "CERT002"
-    },
-    {
-      id: "3",
-      rollNo: "ME003",
-      name: "Mike Johnson",
-      course: "Mechanical Engineering",
-      year: "2024",
-      marks: 78,
-      certificateId: "CERT003"
-    }
-  ]);
+  const sortStudents = (list: Student[]) =>
+    [...list].sort((a, b) => a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true, sensitivity: 'base' }));
+
+  const [students, setStudents] = useState<Student[]>(() => {
+    try {
+      const stored = localStorage.getItem("students");
+      if (stored) {
+        return sortStudents(JSON.parse(stored) as Student[]);
+      }
+    } catch {}
+    return sortStudents([
+      {
+        id: "1",
+        rollNo: "23102A0001",
+        name: "SWAROOP NAIK",
+        course: "Computer Engineering",
+        year: "2023"
+      },
+      {
+        id: "2",
+        rollNo: "23102A0002",
+        name: "TANISHA GUPTA",
+        course: "Computer Engineering",
+        year: "2023"
+      },
+      {
+        id: "3",
+        rollNo: "24102A2001",
+        name: "SIDDHI GAWADE",
+        course: "Computer Engineering",
+        year: "2024"
+      }
+    ]);
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("students", JSON.stringify(sortStudents(students)));
+    } catch {}
+  }, [students]);
 
   const [form, setForm] = useState<StudentForm>({
     rollNo: '',
     name: '',
     course: '',
-    year: '',
-    marks: ''
+    year: ''
   });
 
   const [dragOver, setDragOver] = useState(false);
@@ -74,11 +83,22 @@ export default function StudentManagement() {
   const handleAddStudent = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!form.rollNo || !form.name || !form.course || !form.year || !form.marks) {
+    if (!form.rollNo || !form.name || !form.course || !form.year) {
       toast({
         variant: "destructive",
         title: "Missing Information",
         description: "Please fill in all fields."
+      });
+      return;
+    }
+
+    // Enforce unique roll number
+    const rollExists = students.some((s) => s.rollNo.toLowerCase() === form.rollNo.toLowerCase());
+    if (rollExists) {
+      toast({
+        variant: "destructive",
+        title: "Duplicate Roll Number",
+        description: `A student with roll no \"${form.rollNo}\" already exists.`,
       });
       return;
     }
@@ -88,13 +108,11 @@ export default function StudentManagement() {
       rollNo: form.rollNo,
       name: form.name,
       course: form.course,
-      year: form.year,
-      marks: parseInt(form.marks),
-      certificateId: `CERT${String(students.length + 1).padStart(3, '0')}`
+      year: form.year
     };
 
-    setStudents(prev => [...prev, newStudent]);
-    setForm({ rollNo: '', name: '', course: '', year: '', marks: '' });
+    setStudents(prev => sortStudents([...prev, newStudent]));
+    setForm({ rollNo: '', name: '', course: '', year: '' });
     
     toast({
       title: "Student Added",
@@ -104,7 +122,7 @@ export default function StudentManagement() {
 
   const handleDeleteStudent = (id: string) => {
     const student = students.find(s => s.id === id);
-    setStudents(prev => prev.filter(s => s.id !== id));
+    setStudents(prev => sortStudents(prev.filter(s => s.id !== id)));
     
     toast({
       title: "Student Removed",
@@ -115,15 +133,83 @@ export default function StudentManagement() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type === 'text/csv') {
-      toast({
-        title: "CSV Upload",
-        description: `File "${file.name}" uploaded successfully. Processing...`
-      });
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const csv = event.target?.result as string;
+        parseCSV(csv);
+      };
+      reader.readAsText(file);
     } else {
       toast({
         variant: "destructive",
         title: "Invalid File",
         description: "Please upload a valid CSV file."
+      });
+    }
+  };
+
+  const parseCSV = (csvContent: string) => {
+    try {
+      const lines = csvContent.split('\n').filter(line => line.trim());
+      const headers = lines[0].split(',').map(h => h.trim());
+      
+      // Expected headers: Sr No, Year, Roll No, Name, Course
+      const expectedHeaders = ['Sr No', 'Year', 'Roll No', 'Name', 'Course'];
+      const hasValidHeaders = expectedHeaders.every(header => 
+        headers.some(h => h.toLowerCase().includes(header.toLowerCase()))
+      );
+
+      if (!hasValidHeaders) {
+        toast({
+          variant: "destructive",
+          title: "Invalid CSV Format",
+          description: "CSV must contain columns: Sr No, Year, Roll No, Name, Course"
+        });
+        return;
+      }
+
+      const newStudents: Student[] = [];
+      let duplicates = 0;
+      
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        if (values.length >= 5 && values[0] && values[1] && values[2] && values[3] && values[4]) {
+          const student: Student = {
+            id: Date.now().toString() + i,
+            rollNo: values[2], // Roll No
+            name: values[3],   // Name
+            course: values[4], // Course
+            year: values[1]   // Year
+          };
+          // Skip if roll number already exists in current or new list
+          const existsInCurrent = students.some(s => s.rollNo.toLowerCase() === student.rollNo.toLowerCase());
+          const existsInBatch = newStudents.some(s => s.rollNo.toLowerCase() === student.rollNo.toLowerCase());
+          if (existsInCurrent || existsInBatch) {
+            duplicates++;
+          } else {
+            newStudents.push(student);
+          }
+        }
+      }
+
+      if (newStudents.length > 0) {
+        setStudents(prev => sortStudents([...prev, ...newStudents]));
+        toast({
+          title: "CSV Import Successful",
+          description: `${newStudents.length} students imported successfully.${duplicates ? ` Skipped ${duplicates} duplicate roll nos.` : ''}`
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "No Valid Data",
+          description: duplicates ? `All rows were duplicates by roll no.` : "No valid student records found in the CSV file."
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "CSV Parse Error",
+        description: "Failed to parse CSV file. Please check the format."
       });
     }
   };
@@ -146,10 +232,12 @@ export default function StudentManagement() {
     const csvFile = files.find(file => file.type === 'text/csv');
     
     if (csvFile) {
-      toast({
-        title: "CSV Dropped",
-        description: `File "${csvFile.name}" received. Processing...`
-      });
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const csv = event.target?.result as string;
+        parseCSV(csv);
+      };
+      reader.readAsText(csvFile);
     } else {
       toast({
         variant: "destructive",
@@ -162,6 +250,8 @@ export default function StudentManagement() {
   return (
     <div className="min-h-screen bg-gradient-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
+        <Navigation />
+        <DemoModeBanner />
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
           <Users className="h-8 w-8 text-primary" />
@@ -274,19 +364,6 @@ export default function StudentManagement() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="marks">Marks</Label>
-                  <Input
-                    id="marks"
-                    type="number"
-                    placeholder="85"
-                    min="0"
-                    max="100"
-                    value={form.marks}
-                    onChange={(e) => handleInputChange('marks', e.target.value)}
-                    className="bg-input border-border/50 focus:border-primary/50"
-                  />
-                </div>
 
                 <Button 
                   type="submit" 
@@ -307,6 +384,22 @@ export default function StudentManagement() {
             <CardDescription>
               Complete list of all registered students ({students.length} total)
             </CardDescription>
+            <div className="mt-3">
+              <Button
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => {
+                  if (confirm('This will remove all students. Continue?')) {
+                    setStudents([]);
+                    try { localStorage.setItem('students', JSON.stringify([])); } catch {}
+                    toast({ title: 'All Students Removed', description: 'The student list has been cleared.' });
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Remove All
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="rounded-lg border border-border/50 overflow-hidden">
@@ -317,8 +410,7 @@ export default function StudentManagement() {
                     <TableHead className="font-semibold">Name</TableHead>
                     <TableHead className="font-semibold">Course</TableHead>
                     <TableHead className="font-semibold">Year</TableHead>
-                    <TableHead className="font-semibold">Marks</TableHead>
-                    <TableHead className="font-semibold">Certificate ID</TableHead>
+                    
                     <TableHead className="font-semibold text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -336,20 +428,7 @@ export default function StudentManagement() {
                       <TableCell>{student.name}</TableCell>
                       <TableCell>{student.course}</TableCell>
                       <TableCell>{student.year}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          student.marks >= 90 
-                            ? 'bg-green-500/20 text-green-400' 
-                            : student.marks >= 75 
-                            ? 'bg-blue-500/20 text-blue-400'
-                            : 'bg-yellow-500/20 text-yellow-400'
-                        }`}>
-                          {student.marks}%
-                        </span>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {student.certificateId}
-                      </TableCell>
+                      
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button

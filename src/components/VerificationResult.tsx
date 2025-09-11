@@ -2,55 +2,41 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Shield, Calendar, User, GraduationCap, Award, ArrowLeft, Download, ExternalLink } from "lucide-react";
+import { CheckCircle2, XCircle, Shield, Calendar, User, GraduationCap, Award, ArrowLeft, Download, ExternalLink, FileText, Hash } from "lucide-react";
 
 interface VerificationData {
   method: string;
   input: string;
   timestamp: string;
+  result: any;
 }
 
-// Mock verification result based on input
-const generateVerificationResult = (data: VerificationData) => {
-  const isValid = Math.random() > 0.2; // 80% success rate for demo
-  
-  if (isValid) {
-    return {
-      status: "valid" as const,
-      certificate: {
-        id: data.method === "Certificate ID" ? data.input : "CS001-2024-A7X9K2",
-        studentName: "John Doe",
-        rollNo: "CS001",
-        course: "Computer Science",
-        institution: "Tech University",
-        issueDate: "March 15, 2024",
-        blockchainHash: "0x4f2a6b8c9d3e5f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8",
-        marks: 85,
-        grade: "A"
-      },
-      verificationDetails: {
-        verifiedAt: new Date().toISOString(),
-        method: data.method,
-        blockchainNetwork: "Ethereum Mainnet",
-        transactionId: "0x9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6",
-        confirmations: 247
-      }
-    };
-  } else {
-    return {
-      status: "invalid" as const,
-      error: {
-        code: "CERT_NOT_FOUND",
-        message: "Certificate not found in our verification database",
-        possibleReasons: [
-          "Certificate ID may be incorrect",
-          "Certificate may not be issued by a verified institution",
-          "Certificate may be revoked or expired"
-        ]
-      }
-    };
-  }
-};
+interface Document {
+  id: number;
+  doc_type: string;
+  name: string;
+  number?: string;
+  exam_name?: string;
+  issue_date: string;
+  blockchain_hash: string;
+  status: string;
+  created_at: string;
+}
+
+interface VerificationResult {
+  status: "valid" | "invalid";
+  document?: Document;
+  verification_details?: {
+    verified_at: string;
+    method: string;
+    blockchain_hash: string;
+    ledger_timestamp: string;
+  };
+  error?: {
+    code: string;
+    message: string;
+  };
+}
 
 export default function VerificationResult() {
   const location = useLocation();
@@ -62,7 +48,7 @@ export default function VerificationResult() {
     return null;
   }
 
-  const result = generateVerificationResult(data);
+  const result: VerificationResult = data.result;
 
   return (
     <div className="min-h-screen bg-gradient-background p-6 flex items-center justify-center">
@@ -109,17 +95,17 @@ export default function VerificationResult() {
               )}
             </div>
 
-            {/* Certificate Details */}
-            {result.status === "valid" ? (
+            {/* Document Details */}
+            {result.status === "valid" && result.document ? (
               <div className="space-y-6 pt-8 border-t border-border/30">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                      Certificate ID
+                      Document ID
                     </label>
                     <div className="p-4 rounded-lg bg-muted/20 border border-border/30">
                       <code className="text-lg font-mono font-bold text-primary break-all">
-                        {result.certificate.id}
+                        {result.document.id}
                       </code>
                     </div>
                   </div>
@@ -130,7 +116,7 @@ export default function VerificationResult() {
                     </label>
                     <div className="p-4 rounded-lg bg-muted/20 border border-border/30">
                       <code className="text-sm font-mono text-muted-foreground break-all">
-                        {result.certificate.blockchainHash.substring(0, 16)}...
+                        {result.document.blockchain_hash.substring(0, 16)}...
                       </code>
                     </div>
                   </div>
@@ -147,32 +133,74 @@ export default function VerificationResult() {
                   </div>
                 </div>
 
-                {/* Additional Details */}
+                {/* Document Type and Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                      Student Name
+                      Document Type
                     </label>
-                    <p className="text-xl font-semibold text-foreground">{result.certificate.studentName}</p>
+                    <div className="flex items-center gap-2">
+                      {result.document.doc_type === "certificate" && <Award className="h-5 w-5 text-primary" />}
+                      {result.document.doc_type === "marksheet" && <GraduationCap className="h-5 w-5 text-primary" />}
+                      {result.document.doc_type === "document" && <FileText className="h-5 w-5 text-primary" />}
+                      <p className="text-xl font-semibold text-foreground capitalize">{result.document.doc_type}</p>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                      Course
+                      Document Name
                     </label>
-                    <p className="text-xl font-semibold text-foreground">{result.certificate.course}</p>
+                    <p className="text-xl font-semibold text-foreground">{result.document.name}</p>
                   </div>
+                </div>
+
+                {/* Additional Details based on document type */}
+                {(result.document.number || result.document.exam_name) && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                    {result.document.number && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                          Document Number
+                        </label>
+                        <p className="text-lg font-semibold text-foreground">{result.document.number}</p>
+                      </div>
+                    )}
+                    
+                    {result.document.exam_name && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                          Exam Name
+                        </label>
+                        <p className="text-lg font-semibold text-foreground">{result.document.exam_name}</p>
+                      </div>
+                    )}
+                    
+                  </div>
+                )}
+
+                {/* Issue Date */}
+                <div className="pt-4 border-t border-border/30">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-muted-foreground" />
+                    <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+                      Issue Date
+                    </label>
+                  </div>
+                  <p className="text-lg font-semibold text-foreground mt-2">
+                    {new Date(result.document.issue_date).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
             ) : (
               <div className="space-y-6 pt-8 border-t border-border/30">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-                    Certificate ID
+                    Document ID
                   </label>
                   <div className="p-4 rounded-lg bg-muted/20 border border-red-500/30">
                     <code className="text-lg font-mono font-bold text-red-400 break-all">
-                      {data.method === "Certificate ID" ? data.input : "Not Found"}
+                      {data.method === "Document ID" ? data.input : "Not Found"}
                     </code>
                   </div>
                 </div>
@@ -189,7 +217,10 @@ export default function VerificationResult() {
                 </div>
 
                 <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-                  <p className="text-red-400 font-medium">Error: {result.error.message}</p>
+                  <p className="text-red-400 font-medium">Error: {result.error?.message}</p>
+                  {result.error?.code && (
+                    <p className="text-sm text-red-300 mt-1">Error Code: {result.error.code}</p>
+                  )}
                 </div>
               </div>
             )}
