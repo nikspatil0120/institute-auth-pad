@@ -142,6 +142,10 @@ export default function AuthForm() {
                       type="submit" 
                       className="w-full bg-gradient-primary hover:shadow-glow transition-all duration-300 disabled:opacity-50"
                       disabled={loading}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        window.location.href = '/students';
+                      }}
                     >
                       {loading ? 'Signing in...' : 'Sign In'}
                     </Button>
