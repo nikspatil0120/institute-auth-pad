@@ -8,10 +8,19 @@ import json
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///institute_auth.db'
+
+# Ensure persistent absolute paths regardless of CWD
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'instance', 'institute_auth.db')
+UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
+CERT_DIR = os.path.join(BASE_DIR, 'certificates')
+
+os.makedirs(os.path.join(BASE_DIR, 'instance'), exist_ok=True)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['CERT_OUTPUT_DIR'] = 'certificates'
+app.config['UPLOAD_FOLDER'] = UPLOAD_DIR
+app.config['CERT_OUTPUT_DIR'] = CERT_DIR
 
 # Create directories if they don't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

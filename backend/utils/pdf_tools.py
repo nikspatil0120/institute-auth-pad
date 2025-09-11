@@ -5,11 +5,11 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.colors import Color
 from reportlab.lib.utils import ImageReader
-from PyPDF2 import PdfReader, PdfWriter
+from PyPDF2 import PdfReader, PdfWriter, Transformation
 import qrcode
 from io import BytesIO
 
-def add_watermark_and_qr(input_pdf_path, output_pdf_path, watermark_text, qr_data):
+def add_watermark_and_qr(input_pdf_path, output_pdf_path, watermark_text, qr_data, header_left: str | None = None, header_right: str | None = None):
     """
     Add watermark text and QR code to PDF
     
@@ -52,6 +52,8 @@ def add_watermark_and_qr(input_pdf_path, output_pdf_path, watermark_text, qr_dat
             page_width = float(page.mediabox.width)
             page_height = float(page.mediabox.height)
             
+            # We will extend the page later with a header banner; skip drawing header on this overlay
+
             # Add diagonal watermark
             can.saveState()
             can.setFillColor(Color(0.8, 0.8, 0.8, 0.3))  # Light gray with transparency
@@ -62,8 +64,8 @@ def add_watermark_and_qr(input_pdf_path, output_pdf_path, watermark_text, qr_dat
             can.drawString(100, -100, watermark_text)
             can.restoreState()
             
-            # Add QR code in center bottom
-            qr_size = 120
+            # Add QR code in center bottom (slightly smaller)
+            qr_size = 100
             qr_x = (page_width - qr_size) / 2
             qr_y = 20
             
@@ -81,9 +83,40 @@ def add_watermark_and_qr(input_pdf_path, output_pdf_path, watermark_text, qr_dat
             watermark_pdf = PdfReader(packet)
             watermark_page = watermark_pdf.pages[0]
             
-            # Merge pages
+            # Merge overlay onto content page
             page.merge_page(watermark_page)
-            writer.add_page(page)
+
+            # Create a new page with extra header space and draw the header there (slightly smaller)
+            header_height = 22
+            top_packet = BytesIO()
+            top_can = canvas.Canvas(top_packet, pagesize=(page_width, page_height + header_height))
+            # Banner background
+            top_can.setFillColor(Color(1, 1, 1, 1))
+            top_can.rect(0, page_height, page_width, header_height, fill=1, stroke=0)
+            top_can.setStrokeColor(Color(0.8, 0.8, 0.8, 1))
+            top_can.setLineWidth(0.5)
+            top_can.line(0, page_height, page_width, page_height)
+            # Header text
+            top_can.setFillColor(Color(0.15, 0.15, 0.15, 1))
+            top_can.setFont("Helvetica-Bold", 9.5)
+            if header_left:
+                top_can.drawString(12, page_height + 7, header_left)
+            if header_right:
+                right_text_width = top_can.stringWidth(header_right, "Helvetica-Bold", 9.5)
+                top_can.drawString(page_width - 12 - right_text_width, page_height + 7, header_right)
+            top_can.save()
+
+            top_packet.seek(0)
+            top_pdf = PdfReader(top_packet)
+            new_page = top_pdf.pages[0]
+            # place original page content shifted down
+            try:
+                page.add_transformation(Transformation().translate(0, -header_height))
+                new_page.merge_page(page)
+            except Exception:
+                # Fallback without shifting if transformation not supported
+                new_page.merge_page(page)
+            writer.add_page(new_page)
 
         # Also embed QR data into PDF metadata for fast verification
         try:

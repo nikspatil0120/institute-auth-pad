@@ -5,6 +5,7 @@ from datetime import datetime
 from models.document import Document
 from models.institute import Institute
 from database import db
+from sqlalchemy import func
 from utils.pdf_tools import add_watermark_and_qr, generate_blockchain_hash
 from blockchain.ledger import add_to_ledger, verify_document, remove_doc_from_ledger, reset_ledger
 from routes.auth import verify_token
@@ -54,6 +55,9 @@ def upload_document():
         issue_date_str = request.form.get('issue_date', '')
         student_roll = request.form.get('student_roll')
         student_name = request.form.get('student_name')
+        unique_id = request.form.get('unique_id')
+        grading_type = request.form.get('grading_type')
+        marks = request.form.get('marks')
         # Auto-generate certificate id if not provided
         if not number:
             date_part = datetime.utcnow().strftime('%Y%m%d')
@@ -81,6 +85,9 @@ def upload_document():
             'name': name,
             'number': number,
             'exam_name': exam_name,
+            'unique_id': unique_id,
+            'grading_type': grading_type,
+            'marks': marks,
             'issue_date': issue_date_str,
             'student_roll': student_roll,
             'student_name': student_name,
@@ -88,6 +95,41 @@ def upload_document():
         }
         blockchain_hash = generate_blockchain_hash(doc_data)
         
+        # For certificates without explicit IDs, deterministically generate a Certificate ID from primary attributes
+        if doc_type == 'certificate':
+            cert_fingerprint = {
+                'institute_id': institute.id,
+                'student_roll': student_roll or '',
+                'student_name': (student_name or '').strip().lower(),
+                'course_name': (name or '').strip().lower(),
+                'issue_date': issue_date_str,
+            }
+            generated_cert_id = generate_blockchain_hash(cert_fingerprint)[:16] if generate_blockchain_hash(cert_fingerprint) else None
+            if generated_cert_id:
+                number = generated_cert_id  # store deterministic cert id in number
+            # Enforce uniqueness by this deterministic id
+            existing_cert = Document.query.filter(
+                Document.institute_id == institute.id,
+                Document.doc_type == 'certificate',
+                func.lower(Document.number) == number.strip().lower()
+            ).first() if number else None
+            if existing_cert:
+                return jsonify({'error': 'This certificate already exists (duplicate detected)'}), 409
+
+        # Prevent duplicate issuance based on unique_id for documents/marksheets and use UIN as stored number
+        if doc_type in ['document', 'marksheet']:
+            if not unique_id:
+                return jsonify({'error': 'Unique Identifying Number is required for this document type'}), 400
+            normalized_uid = unique_id.strip()
+            exists = Document.query.filter(
+                Document.institute_id == institute.id,
+                Document.doc_type == doc_type,
+                func.lower(Document.number) == normalized_uid.lower()
+            ).first()
+            if exists:
+                return jsonify({'error': 'A document with this Unique Identifying Number already exists'}), 409
+            number = normalized_uid
+
         # Create document record
         document = Document(
             institute_id=institute.id,
@@ -122,7 +164,10 @@ def upload_document():
         
         # Add watermark and QR code
         watermark_text = f"Verified by {institute.name}"
-        add_watermark_and_qr(temp_path, final_path, watermark_text, qr_data)
+        # Prepare header strings
+        header_left = f"Certificate ID: {number}" if number else None
+        header_right = f"Issue Date: {issue_date.strftime('%Y-%m-%d')}"
+        add_watermark_and_qr(temp_path, final_path, watermark_text, qr_data, header_left=header_left, header_right=header_right)
         
         # Update document with final file path
         document.file_path = final_path
@@ -156,8 +201,29 @@ def get_documents():
         
         documents = Document.query.filter_by(institute_id=institute.id).order_by(Document.created_at.desc()).all()
         
+        docs = []
+        for doc in documents:
+            d = doc.to_dict()
+            # Compute a deterministic certificate id for display for all doc types
+            fingerprint = {
+                'institute_id': doc.institute_id,
+                'doc_type': doc.doc_type,
+                'student_roll': None,
+                'name': doc.name,
+                'exam_name': doc.exam_name,
+                'issue_date': d.get('issue_date')
+            }
+            try:
+                # Best-effort: try to use ledger-like structure for stability
+                cert_id_calc = generate_blockchain_hash(fingerprint)
+                if cert_id_calc:
+                    d['cert_id'] = cert_id_calc[:16]
+            except Exception:
+                d['cert_id'] = None
+            docs.append(d)
+        
         return jsonify({
-            'documents': [doc.to_dict() for doc in documents]
+            'documents': docs
         }), 200
         
     except Exception as e:
@@ -180,7 +246,7 @@ def download_document(doc_id):
         return send_file(
             document.file_path,
             as_attachment=True,
-            download_name=f"{document.name}_{document.doc_type}.pdf",
+            download_name=f"{os.path.basename(document.file_path)}",
             mimetype='application/pdf'
         )
         
@@ -225,16 +291,17 @@ def verify_document_endpoint():
             # Support multiple common keys just in case
             uploaded_file = request.files.get('file') or request.files.get('pdf') or request.files.get('document')
         
-        if not doc_id and not uploaded_file:
-            return jsonify({'error': 'Either doc_id or file upload required'}), 400
-        
-        # Verify document
         # Also support verification by certificate id when provided
         cert_id = None
         if request.is_json and data:
             cert_id = data.get('cert_id')
         else:
             cert_id = request.form.get('cert_id')
+
+        if not doc_id and not uploaded_file and not cert_id:
+            return jsonify({'error': 'Either doc_id, cert_id or file upload required'}), 400
+
+        # Verify document
         result = verify_document(doc_id, uploaded_file, cert_id)
         
         return jsonify(result), 200

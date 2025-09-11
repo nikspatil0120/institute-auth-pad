@@ -14,12 +14,13 @@ import { Upload, FileText, Award, GraduationCap, Download, Hash, Calendar, User,
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import DemoModeBanner from "@/components/DemoModeBanner";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 // Form schemas for different document types
 const documentSchema = z.object({
   student_roll: z.string().min(1, "Roll number is required"),
   name: z.string().min(1, "Name is required"),
-  number: z.string().optional(),
+  unique_id: z.string().min(1, "Unique identifying number is required"),
   issue_date: z.string().min(1, "Issue date is required"),
   file: z.any().refine((file) => file && file[0], "PDF file is required"),
 });
@@ -35,6 +36,7 @@ const marksheetSchema = z.object({
   student_roll: z.string().min(1, "Roll number is required"),
   name: z.string().min(1, "Student name is required"),
   exam_name: z.string().min(1, "Exam name is required"),
+  unique_id: z.string().min(1, "Unique identifying number is required"),
   issue_date: z.string().min(1, "Issue date is required"),
   file: z.any().refine((file) => file && file[0], "PDF file is required"),
 });
@@ -48,6 +50,7 @@ interface Document {
   doc_type: string;
   name: string;
   number?: string;
+  cert_id?: string;
   exam_name?: string;
   issue_date: string;
   blockchain_hash: string;
@@ -102,7 +105,7 @@ const fetchDocuments = async (): Promise<Document[]> => {
   return data.documents;
 };
 
-const downloadDocument = async (docId: number) => {
+const downloadDocument = async (docId: number, suggestedName?: string) => {
   const token = localStorage.getItem("auth_token");
   
   // In demo mode, create a mock PDF download
@@ -189,7 +192,7 @@ startxref
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `document_${docId}.pdf`;
+  a.download = suggestedName ? suggestedName : `document_${docId}.pdf`;
   document.body.appendChild(a);
   a.click();
   window.URL.revokeObjectURL(url);
@@ -216,6 +219,9 @@ export default function DocumentUpload() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("document");
   const [dragOver, setDragOver] = useState(false);
+  const [docPreviewUrl, setDocPreviewUrl] = useState<string | null>(null);
+  const [certPreviewUrl, setCertPreviewUrl] = useState<string | null>(null);
+  const [marksPreviewUrl, setMarksPreviewUrl] = useState<string | null>(null);
 
   // Fetch documents
   const { data: documents = [], isLoading } = useQuery({
@@ -260,6 +266,15 @@ export default function DocumentUpload() {
         description: `${data.type} uploaded successfully!`,
       });
       queryClient.invalidateQueries({ queryKey: ["documents"] });
+      // Clear all forms and previews so inputs disappear after upload
+      try {
+        documentForm.reset();
+        certificateForm.reset();
+        marksheetForm.reset();
+        if (docPreviewUrl) { URL.revokeObjectURL(docPreviewUrl); }
+        if (certPreviewUrl) { URL.revokeObjectURL(certPreviewUrl); }
+        if (marksPreviewUrl) { URL.revokeObjectURL(marksPreviewUrl); }
+      } catch {}
     },
     onError: (error) => {
       // In demo mode, show success even if backend fails
@@ -295,10 +310,21 @@ export default function DocumentUpload() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, form: any) => {
     const file = e.target.files?.[0];
     if (file) {
-      // If already selected, prevent adding more
-      const existing = form.getValues("file");
-      if (existing && existing[0]) return;
+      // Replace whatever was selected before
       form.setValue("file", [file]);
+      try {
+        const url = URL.createObjectURL(file);
+        if (form === documentForm) {
+          if (docPreviewUrl) URL.revokeObjectURL(docPreviewUrl);
+          setDocPreviewUrl(url);
+        } else if (form === certificateForm) {
+          if (certPreviewUrl) URL.revokeObjectURL(certPreviewUrl);
+          setCertPreviewUrl(url);
+        } else if (form === marksheetForm) {
+          if (marksPreviewUrl) URL.revokeObjectURL(marksPreviewUrl);
+          setMarksPreviewUrl(url);
+        }
+      } catch {}
     }
   };
 
@@ -350,6 +376,7 @@ export default function DocumentUpload() {
     // Add fields based on document type
     if (docType === "document") {
       formData.append("name", data.name);
+      formData.append("unique_id", data.unique_id);
       if (data.number) formData.append("number", data.number);
       formData.append("issue_date", data.issue_date);
     } else if (docType === "certificate") {
@@ -358,6 +385,7 @@ export default function DocumentUpload() {
     } else if (docType === "marksheet") {
       formData.append("name", data.name);
       formData.append("exam_name", data.exam_name);
+      formData.append("unique_id", data.unique_id);
       formData.append("issue_date", data.issue_date);
     }
     
@@ -462,15 +490,7 @@ export default function DocumentUpload() {
                         <p className="text-sm text-destructive">{documentForm.formState.errors.name.message}</p>
                       )}
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="doc-number">Document Number (Optional)</Label>
-                      <Input
-                        id="doc-number"
-                        placeholder="e.g., DOC-2024-001"
-                        {...documentForm.register("number")}
-                        className="bg-input border-border/50 focus:border-primary/50"
-                      />
-                    </div>
+                    
                   </div>
                   
                   <div className="space-y-2">
@@ -483,6 +503,19 @@ export default function DocumentUpload() {
                     />
                     {documentForm.formState.errors.issue_date && (
                       <p className="text-sm text-destructive">{documentForm.formState.errors.issue_date.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="doc-uid">Unique Identifying Number</Label>
+                    <Input
+                      id="doc-uid"
+                      placeholder="e.g., Receipt No / Reference No"
+                      {...documentForm.register("unique_id")}
+                      className="bg-input border-border/50 focus:border-primary/50"
+                    />
+                    {documentForm.formState.errors.unique_id && (
+                      <p className="text-sm text-destructive">{documentForm.formState.errors.unique_id.message as string}</p>
                     )}
                   </div>
 
@@ -501,7 +534,24 @@ export default function DocumentUpload() {
                       {documentForm.watch("file") && documentForm.watch("file")[0] ? (
                         <>
                           <p className="text-sm text-muted-foreground mb-2">Selected:</p>
-                          <p className="text-sm font-medium text-foreground mb-4">{documentForm.watch("file")[0].name}</p>
+                          <HoverCard>
+                            <HoverCardTrigger asChild>
+                              <p className="text-sm font-medium text-foreground mb-4 underline cursor-pointer">{documentForm.watch("file")[0].name}</p>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-[720px] h-[520px] p-0 overflow-hidden">
+                              {docPreviewUrl && (
+                                <iframe src={docPreviewUrl} title="preview" className="w-full h-[300px]" />
+                              )}
+                            </HoverCardContent>
+                          </HoverCard>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="mt-2 border-border/50"
+                            onClick={() => { documentForm.setValue("file", []); if (docPreviewUrl) { URL.revokeObjectURL(docPreviewUrl); setDocPreviewUrl(null);} }}
+                          >
+                            Change File
+                          </Button>
                         </>
                       ) : (
                         <>
@@ -517,14 +567,16 @@ export default function DocumentUpload() {
                         className="hidden"
                         id="doc-file"
                       />
-                      <Button asChild variant="outline" className="border-primary/50 hover:bg-primary/10" disabled={!!(documentForm.watch("file") && documentForm.watch("file")[0])}>
+                      {!(documentForm.watch("file") && documentForm.watch("file")[0]) && (
+                      <Button asChild variant="outline" className="border-primary/50 hover:bg-primary/10">
                         <label htmlFor="doc-file" className="cursor-pointer">
                           Choose File
                         </label>
                       </Button>
+                      )}
                     </div>
                     {documentForm.formState.errors.file && (
-                      <p className="text-sm text-destructive">{documentForm.formState.errors.file.message}</p>
+                      <p className="text-sm text-destructive">{String(documentForm.formState.errors.file.message)}</p>
                     )}
                   </div>
 
@@ -604,7 +656,24 @@ export default function DocumentUpload() {
                       {certificateForm.watch("file") && certificateForm.watch("file")[0] ? (
                         <>
                           <p className="text-sm text-muted-foreground mb-2">Selected:</p>
-                          <p className="text-sm font-medium text-foreground mb-4">{certificateForm.watch("file")[0].name}</p>
+                          <HoverCard>
+                            <HoverCardTrigger asChild>
+                              <p className="text-sm font-medium text-foreground mb-4 underline cursor-pointer">{certificateForm.watch("file")[0].name}</p>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-[720px] h-[520px] p-0 overflow-hidden">
+                              {certPreviewUrl && (
+                                <iframe src={certPreviewUrl} title="preview" className="w-full h-[300px]" />
+                              )}
+                            </HoverCardContent>
+                          </HoverCard>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="mt-2 border-border/50"
+                            onClick={() => { certificateForm.setValue("file", []); if (certPreviewUrl) { URL.revokeObjectURL(certPreviewUrl); setCertPreviewUrl(null);} }}
+                          >
+                            Change File
+                          </Button>
                         </>
                       ) : (
                         <>
@@ -620,14 +689,16 @@ export default function DocumentUpload() {
                         className="hidden"
                         id="cert-file"
                       />
-                      <Button asChild variant="outline" className="border-primary/50 hover:bg-primary/10" disabled={!!(certificateForm.watch("file") && certificateForm.watch("file")[0])}>
+                      {!(certificateForm.watch("file") && certificateForm.watch("file")[0]) && (
+                      <Button asChild variant="outline" className="border-primary/50 hover:bg-primary/10">
                         <label htmlFor="cert-file" className="cursor-pointer">
                           Choose File
                         </label>
                       </Button>
+                      )}
                     </div>
                     {certificateForm.formState.errors.file && (
-                      <p className="text-sm text-destructive">{certificateForm.formState.errors.file.message}</p>
+                      <p className="text-sm text-destructive">{String(certificateForm.formState.errors.file.message)}</p>
                     )}
                   </div>
 
@@ -691,6 +762,19 @@ export default function DocumentUpload() {
                         <p className="text-sm text-destructive">{marksheetForm.formState.errors.exam_name.message}</p>
                       )}
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="marksheet-uid">Unique Identifying Number</Label>
+                      <Input
+                        id="marksheet-uid"
+                        placeholder="e.g., Roll/Seat No"
+                        {...marksheetForm.register("unique_id")}
+                        className="bg-input border-border/50 focus:border-primary/50"
+                      />
+                      {marksheetForm.formState.errors.unique_id && (
+                        <p className="text-sm text-destructive">{marksheetForm.formState.errors.unique_id.message as string}</p>
+                      )}
+                    </div>
+                  
                   </div>
                   
                   <div className="space-y-2">
@@ -721,7 +805,24 @@ export default function DocumentUpload() {
                       {marksheetForm.watch("file") && marksheetForm.watch("file")[0] ? (
                         <>
                           <p className="text-sm text-muted-foreground mb-2">Selected:</p>
-                          <p className="text-sm font-medium text-foreground mb-4">{marksheetForm.watch("file")[0].name}</p>
+                          <HoverCard>
+                            <HoverCardTrigger asChild>
+                              <p className="text-sm font-medium text-foreground mb-4 underline cursor-pointer">{marksheetForm.watch("file")[0].name}</p>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-[720px] h-[520px] p-0 overflow-hidden">
+                              {marksPreviewUrl && (
+                                <iframe src={marksPreviewUrl} title="preview" className="w-full h-[300px]" />
+                              )}
+                            </HoverCardContent>
+                          </HoverCard>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="mt-2 border-border/50"
+                            onClick={() => { marksheetForm.setValue("file", []); if (marksPreviewUrl) { URL.revokeObjectURL(marksPreviewUrl); setMarksPreviewUrl(null);} }}
+                          >
+                            Change File
+                          </Button>
                         </>
                       ) : (
                         <>
@@ -737,14 +838,16 @@ export default function DocumentUpload() {
                         className="hidden"
                         id="marksheet-file"
                       />
-                      <Button asChild variant="outline" className="border-primary/50 hover:bg-primary/10" disabled={!!(marksheetForm.watch("file") && marksheetForm.watch("file")[0])}>
+                      {!(marksheetForm.watch("file") && marksheetForm.watch("file")[0]) && (
+                      <Button asChild variant="outline" className="border-primary/50 hover:bg-primary/10">
                         <label htmlFor="marksheet-file" className="cursor-pointer">
                           Choose File
                         </label>
                       </Button>
+                      )}
                     </div>
                     {marksheetForm.formState.errors.file && (
-                      <p className="text-sm text-destructive">{marksheetForm.formState.errors.file.message}</p>
+                      <p className="text-sm text-destructive">{String(marksheetForm.formState.errors.file.message)}</p>
                     )}
                   </div>
 
@@ -800,9 +903,9 @@ export default function DocumentUpload() {
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
                       <TableHead className="font-semibold">Type</TableHead>
                       <TableHead className="font-semibold">Name</TableHead>
-                      <TableHead className="font-semibold">Details</TableHead>
+                      <TableHead className="font-semibold">Certificate ID</TableHead>
                       <TableHead className="font-semibold">Issue Date</TableHead>
-                      <TableHead className="font-semibold">Status</TableHead>
+                      <TableHead className="font-semibold">UIN</TableHead>
                       <TableHead className="font-semibold">Hash</TableHead>
                       <TableHead className="font-semibold text-right">Actions</TableHead>
                     </TableRow>
@@ -823,14 +926,11 @@ export default function DocumentUpload() {
                         </TableCell>
                         <TableCell className="font-medium">{doc.name}</TableCell>
                         <TableCell>
-                          <div className="space-y-1">
-                            {doc.number && (
-                              <p className="text-sm text-muted-foreground">No: {doc.number}</p>
-                            )}
-                            {doc.exam_name && (
-                              <p className="text-sm text-muted-foreground">Exam: {doc.exam_name}</p>
-                            )}
-                          </div>
+                          {doc.cert_id ? (
+                            <code className="text-xs font-mono text-primary">{doc.cert_id}</code>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 text-sm">
@@ -839,12 +939,11 @@ export default function DocumentUpload() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge 
-                            className={`${getStatusColor(doc.status)} font-medium`}
-                            variant="outline"
-                          >
-                            {doc.status.charAt(0).toUpperCase() + doc.status.slice(1)}
-                          </Badge>
+                          {doc.doc_type !== 'certificate' && doc.number ? (
+                            <code className="text-xs font-mono text-muted-foreground">{doc.number}</code>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -858,7 +957,8 @@ export default function DocumentUpload() {
                           <Button
                             onClick={() => {
                               try {
-                                downloadDocument(doc.id);
+                                const safeName = `${doc.name.replace(/[^a-zA-Z0-9_-]+/g, '_')}_${doc.id}.pdf`;
+                                downloadDocument(doc.id, safeName);
                                 toast({
                                   title: "Download Started",
                                   description: `Downloading document ${doc.id}...`,

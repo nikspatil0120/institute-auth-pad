@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import os
 from datetime import datetime
 from models.document import Document
@@ -6,7 +7,8 @@ from database import db
 from PyPDF2 import PdfReader
 import json
 
-LEDGER_FILE = 'ledger.json'
+BASE_DIR = Path(__file__).resolve().parent.parent
+LEDGER_FILE = str(BASE_DIR / 'ledger.json')
 
 def load_ledger():
     """Load ledger from file"""
@@ -171,6 +173,14 @@ def verify_document(doc_id=None, uploaded_file=None, cert_id: str | None = None)
                     'ledger_timestamp': ledger_ts
                 }
             }
+            # Include student details if present in ledger entry data
+            try:
+                data = ledger_entry.get('data') if ledger_entry else None
+                if data:
+                    result['document']['student_roll'] = data.get('student_roll')
+                    result['document']['student_name'] = data.get('student_name')
+            except Exception:
+                pass
             if status == 'invalid':
                 result['error'] = {
                     'code': 'HASH_MISMATCH',
