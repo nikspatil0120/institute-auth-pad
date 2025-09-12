@@ -1,9 +1,10 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { CheckCircle2, XCircle, Shield, Calendar, User, GraduationCap, Award, ArrowLeft, Download, ExternalLink, FileText, Hash } from "lucide-react";
+import { buildInstituteUrl } from "@/lib/institute-utils";
 
 interface VerificationData {
   method: string;
@@ -24,6 +25,7 @@ interface Document {
   created_at: string;
   student_roll?: string;
   student_name?: string;
+  institute_name?: string;
 }
 
 interface VerificationResult {
@@ -46,10 +48,22 @@ type Props = { backPath?: string };
 export default function VerificationResult({ backPath = "/verify" }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { instituteName } = useParams<{ instituteName: string }>();
   const data = location.state as VerificationData;
   
+  // Determine the correct back path based on context
+  const getBackPath = () => {
+    if (backPath !== "/verify") {
+      return backPath; // Use provided path (e.g., for public verification)
+    }
+    if (instituteName) {
+      return buildInstituteUrl("/verify", instituteName);
+    }
+    return backPath; // Fallback to default
+  };
+  
   if (!data) {
-    navigate(backPath);
+    navigate(getBackPath());
     return null;
   }
 
@@ -122,6 +136,12 @@ export default function VerificationResult({ backPath = "/verify" }: Props) {
                       <TableCell className="text-muted-foreground font-medium">Document Name</TableCell>
                       <TableCell>{result.document.name}</TableCell>
                     </TableRow>
+                    {result.document.institute_name && (
+                      <TableRow>
+                        <TableCell className="text-muted-foreground font-medium">Issued By</TableCell>
+                        <TableCell className="font-medium text-primary">{result.document.institute_name}</TableCell>
+                      </TableRow>
+                    )}
                     {result.document.student_name && (
                       <TableRow>
                         <TableCell className="text-muted-foreground font-medium">Student Name</TableCell>
@@ -177,7 +197,7 @@ export default function VerificationResult({ backPath = "/verify" }: Props) {
             {/* Back Button */}
             <div className="pt-8">
               <Button
-                onClick={() => navigate(backPath)}
+                onClick={() => navigate(getBackPath())}
                 variant="outline"
                 size="lg"
                 className="border-primary/50 hover:bg-primary/10 hover:border-primary text-primary font-semibold px-8 py-3 transition-all duration-300"

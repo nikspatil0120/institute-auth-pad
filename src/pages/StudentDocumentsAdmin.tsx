@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import Navigation from "@/components/Navigation";
 import { Calendar, Download, Eye, FileText, GraduationCap, Award, BarChart3 } from "lucide-react";
+import { buildInstituteUrl } from "@/lib/institute-utils";
 
 const API_BASE_URL = "http://localhost:5000/api";
 
@@ -21,7 +22,7 @@ interface DocumentDto {
 }
 
 export default function StudentDocumentsAdmin() {
-  const { roll } = useParams();
+  const { roll, instituteName } = useParams<{ roll: string; instituteName: string }>();
   const navigate = useNavigate();
   const [studentName, setStudentName] = useState<string>("");
   const [docs, setDocs] = useState<DocumentDto[]>([]);
@@ -81,7 +82,7 @@ export default function StudentDocumentsAdmin() {
                 <span className="text-2xl font-bold text-foreground">{studentName || 'Student'}</span>
                 <span className="text-sm text-muted-foreground">{roll}</span>
               </div>
-              <Button variant="outline" onClick={() => navigate('/dashboard')} className="border-border/50">
+              <Button variant="outline" onClick={() => navigate(buildInstituteUrl('/dashboard', instituteName))} className="border-border/50">
                 <BarChart3 className="h-4 w-4 mr-2" /> Back to Dashboard
               </Button>
             </CardTitle>

@@ -6,6 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import DemoModeBanner from "@/components/DemoModeBanner";
 import { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { getCurrentInstituteName } from "@/lib/institute-utils";
 
 interface Student {
   id: string;
@@ -13,24 +15,95 @@ interface Student {
   name: string;
   course: string;
   year: string;
+  institute_name?: string;
 }
 
 export default function CertificatesDashboard() {
   const { toast } = useToast();
+  const { instituteName } = useParams<{ instituteName: string }>();
+  const navigate = useNavigate();
+  const currentInstituteName = getCurrentInstituteName() || instituteName || 'Unknown Institute';
 
   const [students, setStudents] = useState<Student[]>([]);
   const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("students");
-      if (stored) {
-        const list = JSON.parse(stored) as Student[];
-        const sorted = [...list].sort((a, b) => a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true, sensitivity: 'base' }));
-        setStudents(sorted);
-      }
-    } catch {}
+    fetchStudents();
   }, []);
+
+  const fetchStudents = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      // Get students from localStorage (all registered students for current institute)
+      let localStorageStudents: Student[] = [];
+      try {
+        const stored = localStorage.getItem("students");
+        if (stored) {
+          const allStudents = JSON.parse(stored) as Student[];
+          // Filter students for current institute only
+          // Handle both old records (without institute_name) and new records (with institute_name)
+          localStorageStudents = allStudents.filter(s => 
+            !s.institute_name || s.institute_name === currentInstituteName
+          );
+        }
+      } catch (error) {
+        console.warn('Error parsing localStorage students:', error);
+      }
+
+      // Get students from backend (students with documents in ledger)
+      let ledgerStudents: Student[] = [];
+      try {
+        const res = await fetch('http://localhost:5000/api/students', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          ledgerStudents = data.students || [];
+        } else if (res.status === 401) {
+          localStorage.removeItem('auth_token');
+          navigate('/login');
+          return;
+        }
+      } catch (error) {
+        console.warn('Error fetching ledger students:', error);
+      }
+
+      // Merge students: start with localStorage, add any from ledger not in localStorage
+      const localStorageMap = new Map(localStorageStudents.map(s => [s.rollNo, s]));
+      const mergedStudents = [...localStorageStudents];
+      
+      ledgerStudents.forEach(ledgerStudent => {
+        if (!localStorageMap.has(ledgerStudent.rollNo)) {
+          mergedStudents.push(ledgerStudent);
+        }
+      });
+
+      // Sort by roll number
+      mergedStudents.sort((a, b) => a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true, sensitivity: 'base' }));
+      
+      setStudents(mergedStudents);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch students data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredStudents = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -131,12 +204,20 @@ export default function CertificatesDashboard() {
         </div>
 
         {/* Students Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredStudents.map((student) => (
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading students...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredStudents.map((student) => (
             <Card 
               key={student.id}
               className="bg-card/95 backdrop-blur-sm border-border/50 shadow-card hover:shadow-glow transition-all duration-300 hover:scale-[1.02] hover:border-primary/30 group"
-              onClick={() => window.location.href = `/admin/students/${encodeURIComponent(student.rollNo)}`}
+              onClick={() => navigate(`/institute/${instituteName}/students/${encodeURIComponent(student.rollNo)}`)}
               role="button"
               tabIndex={0}
             >
@@ -166,11 +247,12 @@ export default function CertificatesDashboard() {
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Empty State (if no students) */}
-        {students.length === 0 && (
+        {!loading && students.length === 0 && (
           <div className="text-center py-12">
             <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-foreground mb-2">No Students Found</h3>

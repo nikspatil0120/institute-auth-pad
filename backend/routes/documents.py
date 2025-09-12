@@ -464,3 +464,41 @@ def reset_ledger_endpoint():
         return jsonify({'message': 'Ledger reset successful'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@documents_bp.route('/students', methods=['GET'])
+def get_students():
+    """Get all students for the current institute"""
+    try:
+        institute = get_current_institute()
+        if not institute:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        # Get unique students from ledger entries for this institute
+        ledger = load_ledger()
+        students = []
+        seen_rolls = set()
+        
+        for entry in ledger:
+            # Check both top-level and nested institute_id
+            entry_institute_id = entry.get('institute_id') or entry.get('data', {}).get('institute_id')
+            if entry_institute_id == institute.id:
+                data = entry.get('data', {})
+                student_roll = data.get('student_roll')
+                if student_roll and student_roll not in seen_rolls:
+                    seen_rolls.add(student_roll)
+                    students.append({
+                        'id': student_roll,
+                        'rollNo': student_roll,
+                        'name': data.get('student_name', 'Unknown'),
+                        'course': data.get('course', 'N/A'),
+                        'year': data.get('year', 'N/A'),
+                        'institute_name': institute.name
+                    })
+        
+        # Sort by roll number
+        students.sort(key=lambda x: x['rollNo'])
+        
+        return jsonify({'students': students}), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

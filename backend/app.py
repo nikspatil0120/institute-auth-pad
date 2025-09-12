@@ -35,14 +35,17 @@ CORS(app)
 # Import models after db is initialized
 from models.institute import Institute
 from models.document import Document
+from models.legacy_document import LegacyDocument
 
 # Import routes
 from routes.auth import auth_bp
 from routes.documents import documents_bp
+from routes.legacy_documents import legacy_documents_bp
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/api')
 app.register_blueprint(documents_bp, url_prefix='/api')
+app.register_blueprint(legacy_documents_bp, url_prefix='/api')
 
 @app.route('/')
 def index():

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { Upload, Plus, Edit2, Trash2, Users, FileSpreadsheet } from "lucide-reac
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import DemoModeBanner from "@/components/DemoModeBanner";
+import { getCurrentInstituteName } from "@/lib/institute-utils";
 
 interface Student {
   id: string;
@@ -15,6 +17,7 @@ interface Student {
   name: string;
   course: string;
   year: string;
+  institute_name: string;
 }
 
 interface StudentForm {
@@ -26,6 +29,9 @@ interface StudentForm {
 
 export default function StudentManagement() {
   const { toast } = useToast();
+  const { instituteName } = useParams<{ instituteName: string }>();
+  const currentInstituteName = getCurrentInstituteName() || instituteName || 'Unknown Institute';
+  
   const sortStudents = (list: Student[]) =>
     [...list].sort((a, b) => a.rollNo.localeCompare(b.rollNo, undefined, { numeric: true, sensitivity: 'base' }));
 
@@ -33,7 +39,13 @@ export default function StudentManagement() {
     try {
       const stored = localStorage.getItem("students");
       if (stored) {
-        return sortStudents(JSON.parse(stored) as Student[]);
+        const allStudents = JSON.parse(stored) as Student[];
+        // Filter students for current institute only
+        // Handle both old records (without institute_name) and new records (with institute_name)
+        const instituteStudents = allStudents.filter(s => 
+          !s.institute_name || s.institute_name === currentInstituteName
+        );
+        return sortStudents(instituteStudents);
       }
     } catch {}
     return sortStudents([
@@ -42,30 +54,50 @@ export default function StudentManagement() {
         rollNo: "23102A0001",
         name: "SWAROOP NAIK",
         course: "Computer Engineering",
-        year: "2023"
+        year: "2023",
+        institute_name: currentInstituteName
       },
       {
         id: "2",
         rollNo: "23102A0002",
         name: "TANISHA GUPTA",
         course: "Computer Engineering",
-        year: "2023"
+        year: "2023",
+        institute_name: currentInstituteName
       },
       {
         id: "3",
         rollNo: "24102A2001",
         name: "SIDDHI GAWADE",
         course: "Computer Engineering",
-        year: "2024"
+        year: "2024",
+        institute_name: currentInstituteName
       }
     ]);
   });
 
   useEffect(() => {
     try {
-      localStorage.setItem("students", JSON.stringify(sortStudents(students)));
+      // Get all students from localStorage
+      const stored = localStorage.getItem("students");
+      let allStudents: Student[] = [];
+      if (stored) {
+        allStudents = JSON.parse(stored) as Student[];
+      }
+      
+      // Add institute_name to students that don't have it (backward compatibility)
+      const updatedAllStudents = allStudents.map(s => ({
+        ...s,
+        institute_name: s.institute_name || currentInstituteName
+      }));
+      
+      // Remove current institute's students and add updated ones
+      const otherInstituteStudents = updatedAllStudents.filter(s => s.institute_name !== currentInstituteName);
+      const finalStudents = [...otherInstituteStudents, ...students];
+      
+      localStorage.setItem("students", JSON.stringify(finalStudents));
     } catch {}
-  }, [students]);
+  }, [students, currentInstituteName]);
 
   const [form, setForm] = useState<StudentForm>({
     rollNo: '',
@@ -108,7 +140,8 @@ export default function StudentManagement() {
       rollNo: form.rollNo,
       name: form.name,
       course: form.course,
-      year: form.year
+      year: form.year,
+      institute_name: currentInstituteName
     };
 
     setStudents(prev => sortStudents([...prev, newStudent]));
@@ -179,7 +212,8 @@ export default function StudentManagement() {
             rollNo: values[2], // Roll No
             name: values[3],   // Name
             course: values[4], // Course
-            year: values[1]   // Year
+            year: values[1],   // Year
+            institute_name: currentInstituteName
           };
           // Skip if roll number already exists in current or new list
           const existsInCurrent = students.some(s => s.rollNo.toLowerCase() === student.rollNo.toLowerCase());
@@ -410,7 +444,6 @@ export default function StudentManagement() {
                     <TableHead className="font-semibold">Name</TableHead>
                     <TableHead className="font-semibold">Course</TableHead>
                     <TableHead className="font-semibold">Year</TableHead>
-                    
                     <TableHead className="font-semibold text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -428,7 +461,6 @@ export default function StudentManagement() {
                       <TableCell>{student.name}</TableCell>
                       <TableCell>{student.course}</TableCell>
                       <TableCell>{student.year}</TableCell>
-                      
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button

@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
@@ -6,17 +6,22 @@ import {
   Upload, 
   Shield, 
   BarChart3,
-  LogOut
+  LogOut,
+  FileText
 } from "lucide-react";
+import { buildInstituteUrl, getCurrentInstituteName } from "@/lib/institute-utils";
 
 export default function Navigation() {
   const location = useLocation();
+  const { instituteName } = useParams<{ instituteName: string }>();
+  const currentInstituteName = getCurrentInstituteName();
 
   const navItems = [
     { path: "/dashboard", label: "Dashboard", icon: BarChart3 },
     { path: "/students", label: "Student", icon: Users },
     { path: "/upload", label: "Issue", icon: Upload },
     { path: "/verify", label: "Verify", icon: Shield },
+    { path: "/legacy", label: "Legacy", icon: FileText },
   ];
 
   const isActive = (path: string) => {
@@ -27,6 +32,7 @@ export default function Navigation() {
 
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
+    localStorage.removeItem("institute_name");
     window.location.href = "/login";
   };
 
@@ -40,7 +46,9 @@ export default function Navigation() {
               alt="Institute Logo" 
               className="h-8 w-auto"
             />
-            <h2 className="text-lg font-semibold text-foreground">Institute Dashboard</h2>
+            <h2 className="text-lg font-semibold text-foreground">
+              {currentInstituteName || 'Institute'} Dashboard
+            </h2>
           </div>
           
           <nav className="flex items-center gap-2">
@@ -58,7 +66,7 @@ export default function Navigation() {
                       : "hover:bg-muted/50"
                   }`}
                 >
-                  <Link to={item.path}>
+                  <Link to={buildInstituteUrl(item.path, instituteName)}>
                     <Icon className="h-4 w-4" />
                     {item.label}
                   </Link>

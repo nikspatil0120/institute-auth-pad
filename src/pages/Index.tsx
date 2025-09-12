@@ -19,6 +19,12 @@ const Index = () => {
             <Button asChild variant="ghost" className="hover:bg-primary/10">
               <Link to="/student-login">Student Login</Link>
             </Button>
+            <Button asChild variant="ghost" className="hover:bg-primary/10">
+              <Link to="/admin/login">Admin Login</Link>
+            </Button>
+            <Button asChild variant="ghost" className="hover:bg-primary/10">
+              <Link to="/legacy-request">Legacy Documents</Link>
+            </Button>
             <Button asChild className="bg-gradient-primary hover:shadow-glow">
               <Link to="/verify-public">Verify Document</Link>
             </Button>
@@ -143,6 +149,38 @@ const Index = () => {
           <div className="rounded-xl border border-border/50 bg-card/70 p-6 shadow-card">
             <h4 className="font-semibold mb-1">3. Verify</h4>
             <p className="text-muted-foreground">Verify via Certificate ID, UIN, or by uploading the PDF—instantly.</p>
+          </div>
+        </div>
+
+        {/* Legacy Documents Section */}
+        <div className="mt-12 rounded-xl border border-border/50 bg-card/70 p-8 shadow-card">
+          <div className="text-center mb-6">
+            <h3 className="text-2xl font-semibold mb-2">Legacy Document Digitization</h3>
+            <p className="text-muted-foreground">
+              Digitize and verify your old academic documents with our legacy document system
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h4 className="font-semibold text-lg">Submit Legacy Document</h4>
+              <p className="text-muted-foreground">
+                Upload your old certificates, marksheets, or documents for digital verification. 
+                Include student details, UIN, and issuing institute information.
+              </p>
+              <Button asChild className="bg-gradient-primary hover:shadow-glow">
+                <Link to="/legacy-request">Submit Document</Link>
+              </Button>
+            </div>
+            <div className="space-y-4">
+              <h4 className="font-semibold text-lg">Search Legacy Document</h4>
+              <p className="text-muted-foreground">
+                Search for verified legacy documents using UIN. View and download 
+                your digitized documents once they're verified by the institute.
+              </p>
+              <Button asChild variant="outline" className="border-border/50">
+                <Link to="/legacy-search">Search Document</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>

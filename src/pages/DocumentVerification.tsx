@@ -3,7 +3,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { buildInstituteUrl } from "@/lib/institute-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -95,8 +96,20 @@ type DocumentVerificationProps = { minimal?: boolean; resultPath?: string };
 export default function DocumentVerification({ minimal = false, resultPath = "/verify/result" }: DocumentVerificationProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { instituteName } = useParams<{ instituteName: string }>();
   const [activeTab, setActiveTab] = useState("document-id");
   const [dragOver, setDragOver] = useState(false);
+  
+  // Determine the correct result path based on context
+  const getResultPath = () => {
+    if (resultPath !== "/verify/result") {
+      return resultPath; // Use provided path (e.g., for public verification)
+    }
+    if (instituteName) {
+      return buildInstituteUrl("/verify/result", instituteName);
+    }
+    return resultPath; // Fallback to default
+  };
 
   // Form handlers
   const documentIdForm = useForm<DocumentIdFormData>({
@@ -112,7 +125,7 @@ export default function DocumentVerification({ minimal = false, resultPath = "/v
     mutationFn: verifyDocument,
     onSuccess: (result) => {
       // Navigate to results page with verification data
-      navigate(resultPath, { 
+      navigate(getResultPath(), { 
         state: { 
           result,
           method: activeTab === "document-id" ? "Document ID" : "File Upload",

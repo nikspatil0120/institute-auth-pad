@@ -6,11 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, Upload, FileText, Search, CheckCircle2, Lock, Verified } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { buildInstituteUrl } from "@/lib/institute-utils";
 
 export default function CertificateVerification() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { instituteName } = useParams<{ instituteName: string }>();
   const [certificateId, setCertificateId] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -98,7 +100,8 @@ export default function CertificateVerification() {
         timestamp: new Date().toISOString()
       };
 
-      navigate("/verify/result", { state: verificationData });
+      const resultPath = instituteName ? buildInstituteUrl("/verify/result", instituteName) : "/verify/result";
+      navigate(resultPath, { state: verificationData });
     }, 2500);
   };
 

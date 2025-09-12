@@ -194,6 +194,16 @@ def verify_document(doc_id=None, uploaded_file=None, cert_id: str | None = None)
                     db.session.rollback()
             status = 'valid' if is_hash_match else 'invalid'
 
+            # Get institute name
+            institute_name = "Unknown Institute"
+            try:
+                from models.institute import Institute
+                institute = Institute.query.get(document.institute_id)
+                if institute:
+                    institute_name = institute.name
+            except Exception:
+                pass
+            
             result = {
                 'status': status,
                 'document': {
@@ -206,6 +216,7 @@ def verify_document(doc_id=None, uploaded_file=None, cert_id: str | None = None)
                     'blockchain_hash': document.blockchain_hash,
                     'status': document.status,
                     'created_at': document.created_at.isoformat(),
+                    'institute_name': institute_name,
                 },
                 'verification_details': {
                     'verified_at': datetime.utcnow().isoformat(),
