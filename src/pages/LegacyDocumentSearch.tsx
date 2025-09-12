@@ -20,8 +20,11 @@ import {
   Calendar,
   User,
   Hash,
-  Building
+  Building,
+  Scan
 } from "lucide-react";
+import OCRProcessor from "@/components/OCRProcessor";
+import { ParsedData } from "@/services/ocrService";
 
 interface LegacyDocument {
   id: number;
@@ -49,6 +52,8 @@ export default function LegacyDocumentSearch() {
   const [document, setDocument] = useState<LegacyDocument | null>(null);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [showOCR, setShowOCR] = useState(false);
+  const [searchMode, setSearchMode] = useState<'uin' | 'ocr'>('uin');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,6 +174,48 @@ export default function LegacyDocumentSearch() {
     }
   };
 
+  const handleOCRSearch = async (data: ParsedData) => {
+    setLoading(true);
+    setSearched(true);
+    
+    try {
+      // Search using extracted data
+      const searchParams = new URLSearchParams();
+      if (data.uin) searchParams.append('uin', data.uin);
+      if (data.certificateNumber) searchParams.append('uin', data.certificateNumber);
+      if (data.studentName) searchParams.append('student_name', data.studentName);
+      if (data.studentRoll) searchParams.append('student_roll', data.studentRoll);
+      
+      const res = await fetch(`${API_BASE_URL}/legacy/search?${searchParams.toString()}`);
+      const result = await res.json();
+
+      if (res.ok && result.document) {
+        setDocument(result.document);
+        toast({
+          title: "Document Found",
+          description: "Document found using OCR extracted data!",
+        });
+      } else {
+        setDocument(null);
+        toast({
+          variant: "destructive",
+          title: "Document Not Found",
+          description: "No document found with the extracted information.",
+        });
+      }
+    } catch (error) {
+      console.error('Error searching with OCR data:', error);
+      toast({
+        variant: "destructive",
+        title: "Search Error",
+        description: "Failed to search with OCR data. Please try again.",
+      });
+      setDocument(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-background p-6">
       <div className="max-w-4xl mx-auto space-y-8">
@@ -196,42 +243,85 @@ export default function LegacyDocumentSearch() {
               Search Document
             </CardTitle>
             <CardDescription>
-              Enter the UIN (Unique Identification Number) to search for a legacy document
+              Search for legacy documents using UIN or upload a document image for OCR search
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSearch} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="uin">UIN (Unique Identification Number) *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="uin"
-                    placeholder="Enter UIN to search"
-                    value={uin}
-                    onChange={(e) => setUin(e.target.value)}
-                    className="bg-input border-border/50 focus:border-primary/50"
-                    required
-                  />
-                  <Button
-                    type="submit"
-                    disabled={loading}
-                    className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
-                  >
-                    {loading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Searching...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="h-4 w-4 mr-2" />
-                        Search
-                      </>
-                    )}
-                  </Button>
-                </div>
+            <div className="space-y-4">
+              {/* Search Mode Tabs */}
+              <div className="flex space-x-1 bg-muted p-1 rounded-lg">
+                <Button
+                  variant={searchMode === 'uin' ? 'default' : 'ghost'}
+                  onClick={() => setSearchMode('uin')}
+                  className="flex-1"
+                >
+                  Search by UIN
+                </Button>
+                <Button
+                  variant={searchMode === 'ocr' ? 'default' : 'ghost'}
+                  onClick={() => setSearchMode('ocr')}
+                  className="flex-1"
+                >
+                  Search by Document Image
+                </Button>
               </div>
-            </form>
+
+              {/* UIN Search */}
+              {searchMode === 'uin' && (
+                <form onSubmit={handleSearch} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="uin">UIN (Unique Identification Number) *</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="uin"
+                        placeholder="Enter UIN to search"
+                        value={uin}
+                        onChange={(e) => setUin(e.target.value)}
+                        className="bg-input border-border/50 focus:border-primary/50"
+                        required
+                      />
+                      <Button
+                        type="submit"
+                        disabled={loading}
+                        className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
+                      >
+                        {loading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Searching...
+                          </>
+                        ) : (
+                          <>
+                            <Search className="h-4 w-4 mr-2" />
+                            Search
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              )}
+
+              {/* OCR Search */}
+              {searchMode === 'ocr' && (
+                <div className="space-y-4">
+                  <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
+                    <Scan className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-lg font-medium mb-2">Upload Document Image</p>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Upload a scanned document or photo (JPG, PNG, etc.) to extract information and search
+                    </p>
+                    <Button
+                      onClick={() => setShowOCR(true)}
+                      className="bg-gradient-primary hover:shadow-glow transition-all duration-300"
+                    >
+                      <Scan className="h-4 w-4 mr-2" />
+                      Start OCR Search
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -390,6 +480,29 @@ export default function LegacyDocumentSearch() {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* OCR Modal */}
+        {showOCR && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-background rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold">OCR Document Search</h2>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowOCR(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+                <OCRProcessor
+                  onDataExtracted={handleOCRSearch}
+                  showFormFields={false}
+                />
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

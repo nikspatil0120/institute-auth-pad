@@ -20,8 +20,11 @@ import {
   GraduationCap,
   Calendar,
   User,
-  Hash
+  Hash,
+  Scan
 } from "lucide-react";
+import OCRProcessor from "@/components/OCRProcessor";
+import { ParsedData } from "@/services/ocrService";
 
 interface LegacyDocument {
   id: number;
@@ -49,6 +52,8 @@ export default function LegacyDocumentManagement() {
   const [documents, setDocuments] = useState<LegacyDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showOCR, setShowOCR] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState<LegacyDocument | null>(null);
 
   useEffect(() => {
     fetchDocuments();
@@ -124,6 +129,35 @@ export default function LegacyDocumentManagement() {
         title: "Error",
         description: error.message || "Failed to update status"
       });
+    }
+  };
+
+  const handleOCRVerification = (data: ParsedData, document: LegacyDocument) => {
+    // Compare OCR data with stored document data
+    const comparison = {
+      studentName: data.studentName === document.student_name,
+      studentRoll: data.studentRoll === document.student_roll,
+      docType: data.courseName === document.doc_type,
+      uin: data.certificateNumber === document.uin || data.uin === document.uin,
+      marks: data.marks === document.marks?.toString(),
+      dateIssued: data.dateIssued === document.date_issued
+    };
+
+    const matches = Object.values(comparison).filter(Boolean).length;
+    const total = Object.keys(comparison).length;
+    const matchPercentage = Math.round((matches / total) * 100);
+
+    toast({
+      title: "OCR Verification Complete",
+      description: `Document verification: ${matchPercentage}% match with stored data`,
+    });
+
+    setShowOCR(false);
+    setSelectedDocument(null);
+
+    // Auto-approve if high match percentage
+    if (matchPercentage >= 80) {
+      updateStatus(document.id, 'verified');
     }
   };
 
@@ -381,6 +415,18 @@ export default function LegacyDocumentManagement() {
                             >
                               <Download className="h-4 w-4" />
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedDocument(doc);
+                                setShowOCR(true);
+                              }}
+                              className="h-8 w-8 p-0 hover:bg-primary/10"
+                              title="Verify with OCR"
+                            >
+                              <Scan className="h-4 w-4" />
+                            </Button>
                             <div className="flex items-center gap-1">
                               <Button
                                 variant="outline"
@@ -431,6 +477,39 @@ export default function LegacyDocumentManagement() {
             )}
           </CardContent>
         </Card>
+
+        {/* OCR Modal */}
+        {showOCR && selectedDocument && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-background rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold">OCR Document Verification</h2>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowOCR(false);
+                      setSelectedDocument(null);
+                    }}
+                  >
+                    Close
+                  </Button>
+                </div>
+                <div className="mb-4 p-4 bg-muted rounded-lg">
+                  <h3 className="font-semibold mb-2">Verifying Document:</h3>
+                  <p><strong>Student:</strong> {selectedDocument.student_name}</p>
+                  <p><strong>Roll:</strong> {selectedDocument.student_roll}</p>
+                  <p><strong>Type:</strong> {selectedDocument.doc_type}</p>
+                  <p><strong>UIN:</strong> {selectedDocument.uin}</p>
+                </div>
+                <OCRProcessor
+                  onDataExtracted={(data) => handleOCRVerification(data, selectedDocument)}
+                  showFormFields={false}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

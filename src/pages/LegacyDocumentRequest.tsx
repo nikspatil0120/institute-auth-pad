@@ -7,7 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Upload, ArrowLeft, GraduationCap, Award, FileSpreadsheet } from "lucide-react";
+import { FileText, Upload, ArrowLeft, GraduationCap, Award, FileSpreadsheet, Scan } from "lucide-react";
+import OCRProcessor from "@/components/OCRProcessor";
+import { ParsedData } from "@/services/ocrService";
 
 interface Institute {
   id: number;
@@ -23,6 +25,7 @@ export default function LegacyDocumentRequest() {
   const [institutes, setInstitutes] = useState<Institute[]>([]);
   const [loading, setLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [showOCR, setShowOCR] = useState(false);
 
   const [formData, setFormData] = useState({
     studentName: "",
@@ -86,6 +89,25 @@ export default function LegacyDocumentRequest() {
         description: "Please drop a valid PDF file."
       });
     }
+  };
+
+  const handleOCRDataExtracted = (data: ParsedData) => {
+    setFormData(prev => ({
+      ...prev,
+      studentName: data.studentName || prev.studentName,
+      studentRoll: data.studentRoll || prev.studentRoll,
+      uin: data.certificateNumber || data.uin || prev.uin,
+      marks: data.marks || prev.marks,
+      dateIssued: data.dateIssued || prev.dateIssued,
+      docType: data.courseName || prev.docType
+    }));
+    
+    setShowOCR(false);
+    
+    toast({
+      title: "Data Extracted",
+      description: "OCR data has been filled into the form. Please verify and complete any missing fields.",
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -327,7 +349,19 @@ export default function LegacyDocumentRequest() {
 
               {/* Document Upload */}
               <div className="space-y-2">
-                <Label>Document Upload *</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Document Upload *</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowOCR(true)}
+                    className="border-primary/50 hover:bg-primary/10"
+                  >
+                    <Scan className="h-4 w-4 mr-2" />
+                    Extract with OCR
+                  </Button>
+                </div>
                 <div
                   className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                     dragOver 
@@ -395,6 +429,29 @@ export default function LegacyDocumentRequest() {
             </form>
           </CardContent>
         </Card>
+
+        {/* OCR Modal */}
+        {showOCR && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-background rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold">OCR Text Extraction</h2>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowOCR(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
+                <OCRProcessor
+                  onDataExtracted={handleOCRDataExtracted}
+                  showFormFields={true}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

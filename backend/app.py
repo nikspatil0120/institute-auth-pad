@@ -41,11 +41,13 @@ from models.legacy_document import LegacyDocument
 from routes.auth import auth_bp
 from routes.documents import documents_bp
 from routes.legacy_documents import legacy_documents_bp
+from routes.ocr import ocr_bp
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix='/api')
 app.register_blueprint(documents_bp, url_prefix='/api')
 app.register_blueprint(legacy_documents_bp, url_prefix='/api')
+app.register_blueprint(ocr_bp, url_prefix='/api')
 
 @app.route('/')
 def index():

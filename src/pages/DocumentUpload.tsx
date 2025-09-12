@@ -10,11 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, Award, GraduationCap, Download, Hash, Calendar, User, Sparkles, Trash2 } from "lucide-react";
+import { Upload, FileText, Award, GraduationCap, Download, Hash, Calendar, User, Sparkles, Trash2, Scan } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
 import DemoModeBanner from "@/components/DemoModeBanner";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import OCRProcessor from "@/components/OCRProcessor";
+import { ParsedData } from "@/services/ocrService";
 
 // Form schemas for different document types
 const documentSchema = z.object({
@@ -222,6 +224,8 @@ export default function DocumentUpload() {
   const [docPreviewUrl, setDocPreviewUrl] = useState<string | null>(null);
   const [certPreviewUrl, setCertPreviewUrl] = useState<string | null>(null);
   const [marksPreviewUrl, setMarksPreviewUrl] = useState<string | null>(null);
+  const [showOCR, setShowOCR] = useState(false);
+  const [ocrMode, setOcrMode] = useState<'document' | 'certificate' | 'marksheet' | null>(null);
 
   // Fetch documents
   const { data: documents = [], isLoading } = useQuery({
@@ -450,6 +454,37 @@ export default function DocumentUpload() {
     return new Date(dateString).toLocaleDateString();
   };
 
+  const handleOCRDataExtracted = (data: ParsedData, formType: 'document' | 'certificate' | 'marksheet') => {
+    if (formType === 'document') {
+      if (data.studentName) documentForm.setValue('name', data.studentName);
+      if (data.studentRoll) documentForm.setValue('student_roll', data.studentRoll);
+      if (data.certificateNumber) documentForm.setValue('unique_id', data.certificateNumber);
+      if (data.institutionName) {
+        // You might want to add an institution field to the form
+        toast({
+          title: "OCR Data Extracted",
+          description: `Found institution: ${data.institutionName}`,
+        });
+      }
+    } else if (formType === 'certificate') {
+      if (data.studentName) certificateForm.setValue('name', data.studentName);
+      if (data.studentRoll) certificateForm.setValue('student_roll', data.studentRoll);
+    } else if (formType === 'marksheet') {
+      if (data.studentName) marksheetForm.setValue('name', data.studentName);
+      if (data.studentRoll) marksheetForm.setValue('student_roll', data.studentRoll);
+      if (data.certificateNumber) marksheetForm.setValue('unique_id', data.certificateNumber);
+      if (data.courseName) marksheetForm.setValue('exam_name', data.courseName);
+    }
+    
+    setShowOCR(false);
+    setOcrMode(null);
+    
+    toast({
+      title: "Data Extracted",
+      description: "OCR data has been filled into the form. Please verify and complete any missing fields.",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-background p-6">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -550,7 +585,22 @@ export default function DocumentUpload() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Document File (PDF or Image)</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Document File (PDF or Image)</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setOcrMode('document');
+                          setShowOCR(true);
+                        }}
+                        className="border-primary/50 hover:bg-primary/10"
+                      >
+                        <Scan className="h-4 w-4 mr-2" />
+                        Extract with OCR
+                      </Button>
+                    </div>
                     <div
                       className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                         dragOver 
@@ -676,7 +726,22 @@ export default function DocumentUpload() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Document File (PDF or Image)</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Document File (PDF or Image)</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setOcrMode('certificate');
+                          setShowOCR(true);
+                        }}
+                        className="border-primary/50 hover:bg-primary/10"
+                      >
+                        <Scan className="h-4 w-4 mr-2" />
+                        Extract with OCR
+                      </Button>
+                    </div>
                     <div
                       className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                         dragOver 
@@ -829,7 +894,22 @@ export default function DocumentUpload() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Document File (PDF or Image)</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Document File (PDF or Image)</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setOcrMode('marksheet');
+                          setShowOCR(true);
+                        }}
+                        className="border-primary/50 hover:bg-primary/10"
+                      >
+                        <Scan className="h-4 w-4 mr-2" />
+                        Extract with OCR
+                      </Button>
+                    </div>
                     <div
                       className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                         dragOver 
@@ -1044,6 +1124,32 @@ export default function DocumentUpload() {
             )}
           </CardContent>
         </Card>
+
+        {/* OCR Modal */}
+        {showOCR && ocrMode && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-background rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold">OCR Text Extraction</h2>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowOCR(false);
+                      setOcrMode(null);
+                    }}
+                  >
+                    Close
+                  </Button>
+                </div>
+                <OCRProcessor
+                  onDataExtracted={(data) => handleOCRDataExtracted(data, ocrMode)}
+                  showFormFields={true}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
