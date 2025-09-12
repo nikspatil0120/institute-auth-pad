@@ -41,13 +41,15 @@ interface VerificationResult {
   };
 }
 
-export default function VerificationResult() {
+type Props = { backPath?: string };
+
+export default function VerificationResult({ backPath = "/verify" }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const data = location.state as VerificationData;
   
   if (!data) {
-    navigate("/verify");
+    navigate(backPath);
     return null;
   }
 
@@ -106,7 +108,13 @@ export default function VerificationResult() {
                     <TableRow>
                       <TableCell className="text-muted-foreground font-medium">Certificate ID</TableCell>
                       <TableCell>
-                        <code className="font-mono text-primary">{result.document.number || '—'}</code>
+                        <code className="font-mono text-primary">{(result.document as any).cert_id || '—'}</code>
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-muted-foreground font-medium">UIN</TableCell>
+                      <TableCell>
+                        <code className="font-mono">{(result.document as any).uin || (result.document.doc_type !== 'certificate' ? result.document.number : '—')}</code>
                       </TableCell>
                     </TableRow>
                     
@@ -169,7 +177,7 @@ export default function VerificationResult() {
             {/* Back Button */}
             <div className="pt-8">
               <Button
-                onClick={() => navigate("/verify")}
+                onClick={() => navigate(backPath)}
                 variant="outline"
                 size="lg"
                 className="border-primary/50 hover:bg-primary/10 hover:border-primary text-primary font-semibold px-8 py-3 transition-all duration-300"

@@ -247,9 +247,18 @@ export default function AuthForm() {
 
         {/* Footer */}
         <div className="text-center mt-6">
-          <p className="text-sm text-muted-foreground">
-            Secure authentication for educational institutions
-          </p>
+          <div className="flex items-center justify-center gap-4">
+            <p className="text-sm text-muted-foreground">
+              Secure authentication for educational institutions
+            </p>
+            <Button
+              variant="outline"
+              className="border-border/50 hover:bg-muted/20"
+              onClick={() => navigate('/')}
+            >
+              Back to Home
+            </Button>
+          </div>
         </div>
       </div>
     </div>

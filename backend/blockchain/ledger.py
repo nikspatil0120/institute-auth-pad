@@ -98,17 +98,58 @@ def verify_document(doc_id=None, uploaded_file=None, cert_id: str | None = None)
     """
     try:
         ledger = load_ledger()
-
+        
         if cert_id and not doc_id:
-            # Lookup by certificate id (stored in Document.number)
+            # First, try direct match against stored number (works for UIN or stored cert numbers)
             document: Document | None = Document.query.filter_by(number=cert_id).first()
-            if not document:
-                return {
-                    'status': 'invalid',
-                    'error': {'code': 'CERT_ID_NOT_FOUND', 'message': 'Certificate ID not found'}
-                }
-            # Recurse with doc_id to reuse logic
-            return verify_document(doc_id=document.id)
+            if document:
+                return verify_document(doc_id=document.id)
+
+            # Fallback: compute deterministic cert_id for each document and match
+            candidate: Document | None = None
+            try:
+                from utils.pdf_tools import generate_blockchain_hash
+                ledger = load_ledger()
+                # Use latest entry per doc_id to fetch student fields
+                latest_by_id = {}
+                for entry in ledger:
+                    latest_by_id[entry.get('doc_id')] = entry
+                # Iterate all docs - acceptable for small datasets; for large, add index
+                all_docs = Document.query.all()
+                for doc in all_docs:
+                    entry = latest_by_id.get(doc.id)
+                    student_roll = ''
+                    student_name = ''
+                    if entry and entry.get('data'):
+                        data = entry['data']
+                        student_roll = data.get('student_roll') or ''
+                        student_name = (data.get('student_name') or '').strip().lower()
+                    fingerprint = {
+                        'institute_id': doc.institute_id,
+                        'doc_type': doc.doc_type,
+                        'student_roll': student_roll,
+                        'student_name': student_name,
+                        'name': (doc.name or '').strip().lower(),
+                        'exam_name': (doc.exam_name or '').strip().lower() if doc.exam_name else None,
+                        'issue_date': doc.issue_date.isoformat() if doc.issue_date else None,
+                    }
+                    try:
+                        gen_id = generate_blockchain_hash(fingerprint)
+                        if gen_id and gen_id[:16] == cert_id:
+                            candidate = doc
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                candidate = None
+
+            if candidate:
+                return verify_document(doc_id=candidate.id)
+
+            return {
+                'status': 'invalid',
+                'error': {'code': 'CERT_ID_NOT_FOUND', 'message': 'Certificate ID not found'}
+            }
 
         if doc_id:
             # Real verification by Document ID against database and ledger
@@ -122,7 +163,7 @@ def verify_document(doc_id=None, uploaded_file=None, cert_id: str | None = None)
                         'message': 'Invalid document ID format'
                     }
                 }
-
+        
             document: Document | None = Document.query.filter_by(id=doc_id_int).first()
             if not document:
                 return {
@@ -179,6 +220,24 @@ def verify_document(doc_id=None, uploaded_file=None, cert_id: str | None = None)
                 if data:
                     result['document']['student_roll'] = data.get('student_roll')
                     result['document']['student_name'] = data.get('student_name')
+                    result['document']['uin'] = data.get('unique_id')
+                    # Recompute cert_id for display parity
+                    fingerprint = {
+                        'institute_id': document.institute_id,
+                        'doc_type': document.doc_type,
+                        'student_roll': data.get('student_roll') or '',
+                        'student_name': (data.get('student_name') or '').strip().lower(),
+                        'name': (document.name or '').strip().lower(),
+                        'exam_name': (document.exam_name or '').strip().lower() if document.exam_name else None,
+                        'issue_date': document.issue_date.isoformat() if document.issue_date else None,
+                    }
+                    try:
+                        from utils.pdf_tools import generate_blockchain_hash
+                        cid = generate_blockchain_hash(fingerprint)
+                        if cid:
+                            result['document']['cert_id'] = cid[:16]
+                    except Exception:
+                        pass
             except Exception:
                 pass
             if status == 'invalid':

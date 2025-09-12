@@ -7,6 +7,20 @@ from datetime import datetime, timedelta
 
 auth_bp = Blueprint('auth', __name__)
 
+@auth_bp.route('/institutes', methods=['GET'])
+def list_institutes():
+    """Public: List registered institutes for student login dropdown"""
+    try:
+        institutes = Institute.query.order_by(Institute.name.asc()).all()
+        return jsonify({
+            'institutes': [
+                {'id': inst.id, 'name': inst.name}
+                for inst in institutes
+            ]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @auth_bp.route('/register', methods=['POST'])
 def register():
     try:

@@ -136,6 +136,9 @@ export default function CertificatesDashboard() {
             <Card 
               key={student.id}
               className="bg-card/95 backdrop-blur-sm border-border/50 shadow-card hover:shadow-glow transition-all duration-300 hover:scale-[1.02] hover:border-primary/30 group"
+              onClick={() => window.location.href = `/admin/students/${encodeURIComponent(student.rollNo)}`}
+              role="button"
+              tabIndex={0}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
@@ -148,7 +151,6 @@ export default function CertificatesDashboard() {
                       <p className="text-sm text-muted-foreground">{student.rollNo}</p>
                     </div>
                   </div>
-                  <Badge className="font-medium" variant="outline">{student.course}</Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">

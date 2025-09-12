@@ -981,7 +981,7 @@ export default function DocumentUpload() {
                             onClick={async () => {
                               try {
                                 await deleteDocumentApi(doc.id);
-                                toast({ title: 'Document deleted', description: `Document ${doc.id} removed.` });
+                                toast({ title: 'Document deleted', description: `${doc.name} deleted.` });
                                 queryClient.invalidateQueries({ queryKey: ['documents'] });
                               } catch (e: any) {
                                 toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });

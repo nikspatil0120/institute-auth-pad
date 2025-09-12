@@ -16,11 +16,11 @@ import DemoModeBanner from "@/components/DemoModeBanner";
 
 // Form schemas
 const documentIdSchema = z.object({
-  doc_id: z.string().optional(),
   cert_id: z.string().optional(),
-}).refine((data) => !!(data.doc_id || data.cert_id), {
-  message: 'Provide either Document ID or Certificate ID',
-  path: ['doc_id'],
+  uin: z.string().optional(),
+}).refine((data) => !!(data.cert_id || data.uin), {
+  message: 'Provide either Certificate ID or UIN',
+  path: ['cert_id'],
 });
 
 const fileUploadSchema = z.object({
@@ -59,15 +59,12 @@ interface VerificationResult {
 const API_BASE_URL = "http://localhost:5000/api";
 
 // API function
-const verifyDocument = async (data: { doc_id?: string; cert_id?: string; file?: File }): Promise<VerificationResult> => {
+const verifyDocument = async (data: { cert_id?: string; uin?: string; file?: File }): Promise<VerificationResult> => {
   let response;
   
   if (data.file) {
     // Handle file upload
     const formData = new FormData();
-    if (data.doc_id) {
-      formData.append("doc_id", data.doc_id);
-    }
     formData.append("file", data.file);
     
     response = await fetch(`${API_BASE_URL}/verify_document`, {
@@ -81,7 +78,7 @@ const verifyDocument = async (data: { doc_id?: string; cert_id?: string; file?: 
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ doc_id: data.doc_id, cert_id: data.cert_id }),
+      body: JSON.stringify({ cert_id: data.cert_id, uin: data.uin }),
     });
   }
   
@@ -93,7 +90,9 @@ const verifyDocument = async (data: { doc_id?: string; cert_id?: string; file?: 
   return response.json();
 };
 
-export default function DocumentVerification() {
+type DocumentVerificationProps = { minimal?: boolean; resultPath?: string };
+
+export default function DocumentVerification({ minimal = false, resultPath = "/verify/result" }: DocumentVerificationProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("document-id");
@@ -113,11 +112,11 @@ export default function DocumentVerification() {
     mutationFn: verifyDocument,
     onSuccess: (result) => {
       // Navigate to results page with verification data
-      navigate("/verify/result", { 
+      navigate(resultPath, { 
         state: { 
           result,
           method: activeTab === "document-id" ? "Document ID" : "File Upload",
-          input: activeTab === "document-id" ? documentIdForm.getValues("doc_id") : "Uploaded File"
+          input: activeTab === "document-id" ? (documentIdForm.getValues("cert_id") || documentIdForm.getValues("uin") || "") : "Uploaded File"
         } 
       });
     },
@@ -166,7 +165,7 @@ export default function DocumentVerification() {
   };
 
   const onSubmitDocumentId = (data: DocumentIdFormData) => {
-    verifyMutation.mutate({ doc_id: data.doc_id, cert_id: data.cert_id });
+    verifyMutation.mutate({ cert_id: data.cert_id, uin: data.uin });
   };
 
   const onSubmitFileUpload = (data: FileUploadFormData) => {
@@ -191,8 +190,8 @@ export default function DocumentVerification() {
   return (
     <div className="min-h-screen bg-gradient-background p-6">
       <div className="max-w-4xl mx-auto space-y-8">
-        <Navigation />
-        <DemoModeBanner />
+        {!minimal && <Navigation />}
+        {!minimal && <DemoModeBanner />}
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-3 mb-4">
@@ -274,29 +273,26 @@ export default function DocumentVerification() {
                 <form onSubmit={documentIdForm.handleSubmit(onSubmitDocumentId)} className="space-y-4">
                   <div className="space-y-3">
                     <Label className="text-base font-medium">
-                      Enter Document ID or Certificate ID
+                      Enter Certificate ID or UIN
                     </Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <Input
-                        id="document-id"
-                        type="text"
-                        placeholder="Document ID (e.g., 12345)"
-                        {...documentIdForm.register("doc_id")}
-                        className="h-12 text-base bg-input border-border/50 focus:border-green-500/50 focus:ring-green-500/20"
-                      />
-                      <Input
                         id="cert-id"
                         type="text"
-                        placeholder="Certificate ID (e.g., CS001-2024-12345)"
+                        placeholder="Certificate ID (e.g., 59a0106d8a5e6908)"
                         {...documentIdForm.register("cert_id")}
                         className="h-12 text-base bg-input border-border/50 focus:border-green-500/50 focus:ring-green-500/20"
                       />
+                      <Input
+                        id="uin"
+                        type="text"
+                        placeholder="UIN (for Documents/Marksheets)"
+                        {...documentIdForm.register("uin")}
+                        className="h-12 text-base bg-input border-border/50 focus:border-green-500/50 focus:ring-green-500/20"
+                      />
                     </div>
-                    {documentIdForm.formState.errors.doc_id && (
-                      <p className="text-sm text-destructive">{documentIdForm.formState.errors.doc_id.message}</p>
-                    )}
                     <p className="text-sm text-muted-foreground">
-                      Use either the system Document ID or the generated Certificate ID.
+                      Use either the generated Certificate ID or the UIN (for documents/marksheets).
                     </p>
                   </div>
 
@@ -384,7 +380,7 @@ export default function DocumentVerification() {
                       )}
                     </div>
                     {fileUploadForm.formState.errors.file && (
-                      <p className="text-sm text-destructive">{fileUploadForm.formState.errors.file.message}</p>
+                      <p className="text-sm text-destructive">{String(fileUploadForm.formState.errors.file.message)}</p>
                     )}
                     <p className="text-sm text-muted-foreground">
                       Upload your original document PDF file for verification.

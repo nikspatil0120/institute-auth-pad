@@ -2,7 +2,6 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
-  Home, 
   Users, 
   Upload, 
   Shield, 
@@ -14,10 +13,9 @@ export default function Navigation() {
   const location = useLocation();
 
   const navItems = [
-    { path: "/", label: "Home", icon: Home },
-    { path: "/students", label: "Students", icon: Users },
-    { path: "/upload", label: "Upload", icon: Upload },
     { path: "/dashboard", label: "Dashboard", icon: BarChart3 },
+    { path: "/students", label: "Student", icon: Users },
+    { path: "/upload", label: "Issue", icon: Upload },
     { path: "/verify", label: "Verify", icon: Shield },
   ];
 
@@ -29,7 +27,7 @@ export default function Navigation() {
 
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
-    window.location.href = "/";
+    window.location.href = "/login";
   };
 
   return (
@@ -42,7 +40,7 @@ export default function Navigation() {
               alt="Institute Logo" 
               className="h-8 w-auto"
             />
-            <h2 className="text-lg font-semibold text-foreground">Institute Portal</h2>
+            <h2 className="text-lg font-semibold text-foreground">Institute Dashboard</h2>
           </div>
           
           <nav className="flex items-center gap-2">
