@@ -22,14 +22,14 @@ const documentSchema = z.object({
   name: z.string().min(1, "Name is required"),
   unique_id: z.string().min(1, "Unique identifying number is required"),
   issue_date: z.string().min(1, "Issue date is required"),
-  file: z.any().refine((file) => file && file[0], "PDF file is required"),
+  file: z.any().refine((file) => file && file[0], "Document file is required"),
 });
 
 const certificateSchema = z.object({
   student_roll: z.string().min(1, "Roll number is required"),
   name: z.string().min(1, "Certificate name is required"),
   issue_date: z.string().min(1, "Issue date is required"),
-  file: z.any().refine((file) => file && file[0], "PDF file is required"),
+  file: z.any().refine((file) => file && file[0], "Document file is required"),
 });
 
 const marksheetSchema = z.object({
@@ -38,7 +38,7 @@ const marksheetSchema = z.object({
   exam_name: z.string().min(1, "Exam name is required"),
   unique_id: z.string().min(1, "Unique identifying number is required"),
   issue_date: z.string().min(1, "Issue date is required"),
-  file: z.any().refine((file) => file && file[0], "PDF file is required"),
+  file: z.any().refine((file) => file && file[0], "Document file is required"),
 });
 
 type DocumentFormData = z.infer<typeof documentSchema>;
@@ -310,6 +310,17 @@ export default function DocumentUpload() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, form: any) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      const isValidFile = file.type === "application/pdf" || file.type.startsWith("image/");
+      if (!isValidFile) {
+        toast({
+          variant: "destructive",
+          title: "Invalid File Type",
+          description: "Please select a PDF or image file.",
+        });
+        return;
+      }
+
       // Replace whatever was selected before
       form.setValue("file", [file]);
       try {
@@ -343,15 +354,34 @@ export default function DocumentUpload() {
     setDragOver(false);
     
     const files = Array.from(e.dataTransfer.files);
-    const pdfFile = files.find(file => file.type === "application/pdf");
+    const validFile = files.find(file => 
+      file.type === "application/pdf" || 
+      file.type.startsWith("image/")
+    );
     
-    if (pdfFile) {
-      form.setValue("file", [pdfFile]);
+    if (validFile) {
+      form.setValue("file", [validFile]);
+      // Create preview URL for images
+      if (validFile.type.startsWith("image/")) {
+        try {
+          const url = URL.createObjectURL(validFile);
+          if (form === documentForm) {
+            if (docPreviewUrl) URL.revokeObjectURL(docPreviewUrl);
+            setDocPreviewUrl(url);
+          } else if (form === certificateForm) {
+            if (certPreviewUrl) URL.revokeObjectURL(certPreviewUrl);
+            setCertPreviewUrl(url);
+          } else if (form === marksheetForm) {
+            if (marksPreviewUrl) URL.revokeObjectURL(marksPreviewUrl);
+            setMarksPreviewUrl(url);
+          }
+        } catch {}
+      }
     } else {
       toast({
         variant: "destructive",
         title: "Invalid File",
-        description: "Please drop a valid PDF file.",
+        description: "Please drop a valid PDF or image file.",
       });
     }
   };
@@ -520,7 +550,7 @@ export default function DocumentUpload() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>PDF File</Label>
+                    <Label>Document File (PDF or Image)</Label>
                     <div
                       className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                         dragOver 
@@ -540,7 +570,11 @@ export default function DocumentUpload() {
                             </HoverCardTrigger>
                             <HoverCardContent className="w-[720px] h-[520px] p-0 overflow-hidden">
                               {docPreviewUrl && (
-                                <iframe src={docPreviewUrl} title="preview" className="w-full h-[300px]" />
+                                documentForm.watch("file")[0].type.startsWith("image/") ? (
+                                  <img src={docPreviewUrl} alt="preview" className="w-full h-full object-contain" />
+                                ) : (
+                                  <iframe src={docPreviewUrl} title="preview" className="w-full h-[300px]" />
+                                )
                               )}
                             </HoverCardContent>
                           </HoverCard>
@@ -556,13 +590,13 @@ export default function DocumentUpload() {
                       ) : (
                         <>
                           <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                          <p className="text-lg font-medium mb-2">Drop PDF file here</p>
-                          <p className="text-sm text-muted-foreground mb-4">or click to browse files</p>
+                          <p className="text-lg font-medium mb-2">Drop document here</p>
+                          <p className="text-sm text-muted-foreground mb-4">PDF or image files (JPG, PNG, etc.)</p>
                         </>
                       )}
                       <input
                         type="file"
-                        accept=".pdf"
+                        accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,.tiff"
                         onChange={(e) => handleFileUpload(e, documentForm)}
                         className="hidden"
                         id="doc-file"
@@ -642,7 +676,7 @@ export default function DocumentUpload() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>PDF File</Label>
+                    <Label>Document File (PDF or Image)</Label>
                     <div
                       className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                         dragOver 
@@ -662,7 +696,11 @@ export default function DocumentUpload() {
                             </HoverCardTrigger>
                             <HoverCardContent className="w-[720px] h-[520px] p-0 overflow-hidden">
                               {certPreviewUrl && (
-                                <iframe src={certPreviewUrl} title="preview" className="w-full h-[300px]" />
+                                certificateForm.watch("file")[0].type.startsWith("image/") ? (
+                                  <img src={certPreviewUrl} alt="preview" className="w-full h-full object-contain" />
+                                ) : (
+                                  <iframe src={certPreviewUrl} title="preview" className="w-full h-[300px]" />
+                                )
                               )}
                             </HoverCardContent>
                           </HoverCard>
@@ -678,13 +716,13 @@ export default function DocumentUpload() {
                       ) : (
                         <>
                           <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                          <p className="text-lg font-medium mb-2">Drop PDF file here</p>
-                          <p className="text-sm text-muted-foreground mb-4">or click to browse files</p>
+                          <p className="text-lg font-medium mb-2">Drop document here</p>
+                          <p className="text-sm text-muted-foreground mb-4">PDF or image files (JPG, PNG, etc.)</p>
                         </>
                       )}
                       <input
                         type="file"
-                        accept=".pdf"
+                        accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,.tiff"
                         onChange={(e) => handleFileUpload(e, certificateForm)}
                         className="hidden"
                         id="cert-file"
@@ -791,7 +829,7 @@ export default function DocumentUpload() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>PDF File</Label>
+                    <Label>Document File (PDF or Image)</Label>
                     <div
                       className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                         dragOver 
@@ -811,7 +849,11 @@ export default function DocumentUpload() {
                             </HoverCardTrigger>
                             <HoverCardContent className="w-[720px] h-[520px] p-0 overflow-hidden">
                               {marksPreviewUrl && (
-                                <iframe src={marksPreviewUrl} title="preview" className="w-full h-[300px]" />
+                                marksheetForm.watch("file")[0].type.startsWith("image/") ? (
+                                  <img src={marksPreviewUrl} alt="preview" className="w-full h-full object-contain" />
+                                ) : (
+                                  <iframe src={marksPreviewUrl} title="preview" className="w-full h-[300px]" />
+                                )
                               )}
                             </HoverCardContent>
                           </HoverCard>
@@ -827,13 +869,13 @@ export default function DocumentUpload() {
                       ) : (
                         <>
                           <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                          <p className="text-lg font-medium mb-2">Drop PDF file here</p>
-                          <p className="text-sm text-muted-foreground mb-4">or click to browse files</p>
+                          <p className="text-lg font-medium mb-2">Drop document here</p>
+                          <p className="text-sm text-muted-foreground mb-4">PDF or image files (JPG, PNG, etc.)</p>
                         </>
                       )}
                       <input
                         type="file"
-                        accept=".pdf"
+                        accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,.tiff"
                         onChange={(e) => handleFileUpload(e, marksheetForm)}
                         className="hidden"
                         id="marksheet-file"
