@@ -419,6 +419,10 @@ def delete_document(doc_id):
 @documents_bp.route('/verify_document', methods=['POST'])
 def verify_document_endpoint():
     try:
+        # Get current institute for permission checking
+        from routes.auth import get_current_institute
+        current_institute = get_current_institute()
+        
         # Handle both JSON and form data
         if request.is_json:
             data = request.get_json()
@@ -446,9 +450,9 @@ def verify_document_endpoint():
         if not doc_id and not uploaded_file and not cert_id and not uin:
             return jsonify({'error': 'Either doc_id, cert_id, uin or file upload required'}), 400
 
-        # Verify document
+        # Verify document with institute permission check
         # If only UIN is provided, treat it like cert_id lookup since both map to Document.number
-        result = verify_document(doc_id, uploaded_file, cert_id or uin)
+        result = verify_document(doc_id, uploaded_file, cert_id or uin, current_institute)
         
         return jsonify(result), 200
         

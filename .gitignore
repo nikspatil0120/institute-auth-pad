@@ -25,3 +25,5 @@ dist-ssr
 backend/uploads/temp_1757619989.840445_Static.AI_VDT.StaticFileResourceHandle.pdf
 backend/uploads/temp_1757619996.203879_Static.AI_VDT.StaticFileResourceHandle.pdf
 backend/certificates/Fees_Receipt_1.pdf
+create_favicon.js
+generate_favicon.html

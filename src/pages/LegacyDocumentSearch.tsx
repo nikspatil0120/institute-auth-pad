@@ -49,7 +49,8 @@ export default function LegacyDocumentSearch() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [uin, setUin] = useState("");
-  const [document, setDocument] = useState<LegacyDocument | null>(null);
+  const [documents, setDocuments] = useState<LegacyDocument[]>([]);
+  const [documentCount, setDocumentCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [showOCR, setShowOCR] = useState(false);
@@ -61,7 +62,7 @@ export default function LegacyDocumentSearch() {
       toast({
         variant: "destructive",
         title: "Missing UIN",
-        description: "Please enter a UIN to search for the document."
+        description: "Please enter a UIN to search for documents."
       });
       return;
     }
@@ -74,33 +75,38 @@ export default function LegacyDocumentSearch() {
       const data = await res.json();
 
       if (res.ok) {
-        setDocument(data.document);
+        setDocuments(data.documents || []);
+        setDocumentCount(data.count || 0);
+        toast({
+          title: "Documents Found",
+          description: `Found ${data.count || 0} document(s) for UIN: ${uin}`
+        });
       } else {
-        setDocument(null);
+        setDocuments([]);
+        setDocumentCount(0);
         toast({
           variant: "destructive",
-          title: "Document Not Found",
-          description: data.error || "No legacy document found with this UIN."
+          title: "No Documents Found",
+          description: data.error || "No legacy documents found with this UIN."
         });
       }
     } catch (error) {
-      console.error('Error searching document:', error);
+      console.error('Error searching documents:', error);
       toast({
         variant: "destructive",
         title: "Search Error",
-        description: "Failed to search for the document. Please try again."
+        description: "Failed to search for documents. Please try again."
       });
-      setDocument(null);
+      setDocuments([]);
+      setDocumentCount(0);
     } finally {
       setLoading(false);
     }
   };
 
-  const downloadDocument = async () => {
-    if (!document) return;
-
+  const downloadDocument = async (documentId: number, studentName: string, docType: string) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/legacy/download/${document.id}`);
+      const res = await fetch(`${API_BASE_URL}/legacy/download/${documentId}`);
       if (!res.ok) {
         const errorData = await res.json();
         toast({
@@ -115,7 +121,7 @@ export default function LegacyDocumentSearch() {
       const url = URL.createObjectURL(blob);
       const a = window.document.createElement("a");
       a.href = url;
-      a.download = `legacy_${document.student_name.replace(/\s+/g, '_')}_${document.doc_type}.pdf`;
+      a.download = `legacy_${studentName.replace(/\s+/g, '_')}_${docType}.pdf`;
       window.document.body.appendChild(a);
       a.click();
       URL.revokeObjectURL(url);
@@ -130,9 +136,8 @@ export default function LegacyDocumentSearch() {
     }
   };
 
-  const viewDocument = () => {
-    if (!document) return;
-    window.open(`${API_BASE_URL}/legacy/view/${document.id}`, "_blank");
+  const viewDocument = (documentId: number) => {
+    window.open(`${API_BASE_URL}/legacy/view/${documentId}`, "_blank");
   };
 
   const getStatusIcon = (status: string) => {
@@ -190,13 +195,13 @@ export default function LegacyDocumentSearch() {
       const result = await res.json();
 
       if (res.ok && result.document) {
-        setDocument(result.document);
+        setDocuments([result.document]);
         toast({
           title: "Document Found",
           description: "Document found using OCR extracted data!",
         });
       } else {
-        setDocument(null);
+        setDocuments([]);
         toast({
           variant: "destructive",
           title: "Document Not Found",
@@ -210,7 +215,7 @@ export default function LegacyDocumentSearch() {
         title: "Search Error",
         description: "Failed to search with OCR data. Please try again.",
       });
-      setDocument(null);
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
@@ -331,28 +336,30 @@ export default function LegacyDocumentSearch() {
             <CardHeader>
               <CardTitle>Search Results</CardTitle>
               <CardDescription>
-                {document ? "Document found" : "No document found with this UIN"}
+                {documents.length > 0 ? `Found ${documents.length} document(s)` : "No document found with this UIN"}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {document ? (
+              {documents.length > 0 ? (
                 <div className="space-y-6">
-                  {/* Document Status */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {getDocTypeIcon(document.doc_type)}
-                      <div>
-                        <h3 className="text-lg font-semibold capitalize">{document.doc_type}</h3>
-                        <p className="text-sm text-muted-foreground">Legacy Document</p>
+                  {documents.map((document) => (
+                    <div key={document.id} className="space-y-6 border-b pb-6 last:border-b-0 last:pb-0">
+                      {/* Document Status */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {getDocTypeIcon(document.doc_type)}
+                          <div>
+                            <h3 className="text-lg font-semibold capitalize">{document.doc_type}</h3>
+                            <p className="text-sm text-muted-foreground">Legacy Document</p>
+                          </div>
+                        </div>
+                        <Badge className={getStatusColor(document.status)}>
+                          <div className="flex items-center gap-1">
+                            {getStatusIcon(document.status)}
+                            {document.status}
+                          </div>
+                        </Badge>
                       </div>
-                    </div>
-                    <Badge className={getStatusColor(document.status)}>
-                      <div className="flex items-center gap-1">
-                        {getStatusIcon(document.status)}
-                        {document.status}
-                      </div>
-                    </Badge>
-                  </div>
 
                   {/* Document Details */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -387,7 +394,7 @@ export default function LegacyDocumentSearch() {
                         <div>
                           <p className="text-sm text-muted-foreground">Date Issued</p>
                           <p className="font-medium">
-                            {new Date(document.date_issued).toLocaleDateString()}
+                            {document.date_issued ? new Date(document.date_issued).toLocaleDateString() : 'Invalid Date'}
                           </p>
                         </div>
                       </div>
@@ -434,7 +441,7 @@ export default function LegacyDocumentSearch() {
                   {/* Actions */}
                   <div className="flex gap-2">
                     <Button
-                      onClick={viewDocument}
+                      onClick={() => viewDocument(document.id)}
                       variant="outline"
                       className="border-border/50 hover:bg-primary/10"
                     >
@@ -442,7 +449,7 @@ export default function LegacyDocumentSearch() {
                       View Document
                     </Button>
                     <Button
-                      onClick={downloadDocument}
+                      onClick={() => downloadDocument(document.id, document.student_name, document.doc_type)}
                       disabled={document.status !== 'verified'}
                       className={`${
                         document.status === 'verified' 
@@ -468,6 +475,8 @@ export default function LegacyDocumentSearch() {
                       </p>
                     </div>
                   )}
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-8">

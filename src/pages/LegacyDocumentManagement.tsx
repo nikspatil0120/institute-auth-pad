@@ -21,10 +21,13 @@ import {
   Calendar,
   User,
   Hash,
-  Scan
+  Shield,
+  AlertTriangle,
+  Trash2
 } from "lucide-react";
-import OCRProcessor from "@/components/OCRProcessor";
-import { ParsedData } from "@/services/ocrService";
+import FraudDetectionAlert from "@/components/FraudDetectionAlert";
+import FraudAnalysisModal from "@/components/FraudAnalysisModal";
+import fraudDetectionService, { FraudAnalysis } from "@/services/fraudDetectionService";
 
 interface LegacyDocument {
   id: number;
@@ -40,6 +43,10 @@ interface LegacyDocument {
   cert_id?: string;
   verified_at?: string;
   verified_by?: string;
+  fraud_risk?: string;
+  fraud_score?: number;
+  fraud_analysis?: string;
+  requires_manual_review?: boolean;
   created_at: string;
 }
 
@@ -52,8 +59,9 @@ export default function LegacyDocumentManagement() {
   const [documents, setDocuments] = useState<LegacyDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [showOCR, setShowOCR] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<LegacyDocument | null>(null);
+  const [fraudAnalysis, setFraudAnalysis] = useState<FraudAnalysis | null>(null);
+  const [showFraudAnalysis, setShowFraudAnalysis] = useState(false);
+  const [isAnalyzingFraud, setIsAnalyzingFraud] = useState(false);
 
   useEffect(() => {
     fetchDocuments();
@@ -132,32 +140,83 @@ export default function LegacyDocumentManagement() {
     }
   };
 
-  const handleOCRVerification = (data: ParsedData, document: LegacyDocument) => {
-    // Compare OCR data with stored document data
-    const comparison = {
-      studentName: data.studentName === document.student_name,
-      studentRoll: data.studentRoll === document.student_roll,
-      docType: data.courseName === document.doc_type,
-      uin: data.certificateNumber === document.uin || data.uin === document.uin,
-      marks: data.marks === document.marks?.toString(),
-      dateIssued: data.dateIssued === document.date_issued
-    };
+  const deleteDocument = async (documentId: number) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${API_BASE_URL}/legacy/requests/${documentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
 
-    const matches = Object.values(comparison).filter(Boolean).length;
-    const total = Object.keys(comparison).length;
-    const matchPercentage = Math.round((matches / total) * 100);
+      if (res.ok) {
+        // Remove from local state
+        setDocuments(prev => prev.filter(doc => doc.id !== documentId));
+        
+        toast({
+          title: "Document Deleted",
+          description: "Document has been successfully deleted from the database."
+        });
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete document');
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Delete Failed",
+        description: error.message || "Failed to delete document"
+      });
+    }
+  };
 
-    toast({
-      title: "OCR Verification Complete",
-      description: `Document verification: ${matchPercentage}% match with stored data`,
-    });
-
-    setShowOCR(false);
-    setSelectedDocument(null);
-
-    // Auto-approve if high match percentage
-    if (matchPercentage >= 80) {
-      updateStatus(document.id, 'verified');
+  const analyzeFraud = async (document: LegacyDocument) => {
+    try {
+      setIsAnalyzingFraud(true);
+      const fraudResult = await fraudDetectionService.validateDocument(document.id);
+      setFraudAnalysis(fraudResult);
+      setShowFraudAnalysis(true);
+      
+      // Save fraud analysis to database
+      try {
+        await fetch(`${API_BASE_URL}/legacy/requests/${document.id}/fraud-analysis`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            fraud_risk: fraudResult.risk_level,
+            fraud_score: fraudResult.fraud_probability,
+            fraud_analysis: JSON.stringify(fraudResult),
+            requires_manual_review: fraudResult.risk_level === 'HIGH' || fraudResult.risk_level === 'MEDIUM'
+          })
+        });
+      } catch (error) {
+        console.error('Failed to save fraud analysis:', error);
+      }
+      
+      // Update document in local state
+      setDocuments(prev => prev.map(doc => 
+        doc.id === document.id 
+          ? { ...doc, fraud_risk: fraudResult.risk_level, fraud_score: fraudResult.fraud_probability }
+          : doc
+      ));
+      
+      toast({
+        title: "Fraud Analysis Complete",
+        description: `Document shows ${fraudResult.risk_level.toLowerCase()} fraud risk.`
+      });
+    } catch (error) {
+      console.error('Fraud analysis failed:', error);
+      toast({
+        variant: "destructive",
+        title: "Analysis Failed",
+        description: "Failed to analyze document for fraud."
+      });
+    } finally {
+      setIsAnalyzingFraud(false);
     }
   };
 
@@ -347,6 +406,7 @@ export default function LegacyDocumentManagement() {
                       <TableHead className="font-semibold">UIN</TableHead>
                       <TableHead className="font-semibold">Date Issued</TableHead>
                       <TableHead className="font-semibold">Status</TableHead>
+                      <TableHead className="font-semibold">Fraud Risk</TableHead>
                       <TableHead className="font-semibold">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -392,6 +452,20 @@ export default function LegacyDocumentManagement() {
                           </Badge>
                         </TableCell>
                         <TableCell>
+                          {doc.fraud_risk ? (
+                            <Badge className={fraudDetectionService.getRiskLevelColor(doc.fraud_risk)}>
+                              <div className="flex items-center gap-1">
+                                {doc.fraud_risk === 'HIGH' && <AlertTriangle className="h-3 w-3" />}
+                                {doc.fraud_risk === 'MEDIUM' && <Clock className="h-3 w-3" />}
+                                {doc.fraud_risk === 'LOW' && <CheckCircle className="h-3 w-3" />}
+                                {doc.fraud_risk}
+                              </div>
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">Not analyzed</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2">
                             <Button
                               variant="ghost"
@@ -418,14 +492,21 @@ export default function LegacyDocumentManagement() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => {
-                                setSelectedDocument(doc);
-                                setShowOCR(true);
-                              }}
-                              className="h-8 w-8 p-0 hover:bg-primary/10"
-                              title="Verify with OCR"
+                              onClick={() => deleteDocument(doc.id)}
+                              className="h-8 w-8 p-0 hover:bg-destructive/10 text-destructive hover:text-destructive"
+                              title="Delete Document"
                             >
-                              <Scan className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => analyzeFraud(doc)}
+                              className="h-8 w-8 p-0 hover:bg-primary/10"
+                              title="Analyze for Fraud"
+                              disabled={isAnalyzingFraud}
+                            >
+                              <Shield className="h-4 w-4" />
                             </Button>
                             <div className="flex items-center gap-1">
                               <Button
@@ -478,37 +559,21 @@ export default function LegacyDocumentManagement() {
           </CardContent>
         </Card>
 
-        {/* OCR Modal */}
-        {showOCR && selectedDocument && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-background rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-2xl font-bold">OCR Document Verification</h2>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowOCR(false);
-                      setSelectedDocument(null);
-                    }}
-                  >
-                    Close
-                  </Button>
-                </div>
-                <div className="mb-4 p-4 bg-muted rounded-lg">
-                  <h3 className="font-semibold mb-2">Verifying Document:</h3>
-                  <p><strong>Student:</strong> {selectedDocument.student_name}</p>
-                  <p><strong>Roll:</strong> {selectedDocument.student_roll}</p>
-                  <p><strong>Type:</strong> {selectedDocument.doc_type}</p>
-                  <p><strong>UIN:</strong> {selectedDocument.uin}</p>
-                </div>
-                <OCRProcessor
-                  onDataExtracted={(data) => handleOCRVerification(data, selectedDocument)}
-                  showFormFields={false}
-                />
-              </div>
-            </div>
-          </div>
+
+        {/* Fraud Analysis Modal */}
+        {fraudAnalysis && (
+          <FraudAnalysisModal
+            isOpen={showFraudAnalysis}
+            onClose={() => setShowFraudAnalysis(false)}
+            fraudAnalysis={fraudAnalysis}
+            onReportFraud={() => {
+              // Handle fraud reporting
+              toast({
+                title: "Fraud Report",
+                description: "Fraud reporting functionality will be implemented."
+              });
+            }}
+          />
         )}
       </div>
     </div>

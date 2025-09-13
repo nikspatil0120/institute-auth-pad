@@ -115,48 +115,48 @@ export default function VerificationResult({ backPath = "/verify" }: Props) {
             </div>
 
             {/* Document Details */}
-            {result.status === "valid" && result.document ? (
+            {result.status === "valid" && (result.document || result.certificate_id) ? (
               <div className="space-y-6 pt-8 border-t border-border/30">
                 <Table>
                   <TableBody>
                     <TableRow>
                       <TableCell className="text-muted-foreground font-medium">Certificate ID</TableCell>
                       <TableCell>
-                        <code className="font-mono text-primary">{(result.document as any).cert_id || '—'}</code>
+                        <code className="font-mono text-primary">{result.certificate_id || (result.document as any)?.cert_id || '—'}</code>
                       </TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell className="text-muted-foreground font-medium">UIN</TableCell>
                       <TableCell>
-                        <code className="font-mono">{(result.document as any).uin || (result.document.doc_type !== 'certificate' ? result.document.number : '—')}</code>
+                        <code className="font-mono">{result.uin || (result.document as any)?.uin || (result.document?.doc_type !== 'certificate' ? result.document?.number : '—')}</code>
                       </TableCell>
                     </TableRow>
                     
                     <TableRow>
                       <TableCell className="text-muted-foreground font-medium">Document Name</TableCell>
-                      <TableCell>{result.document.name}</TableCell>
+                      <TableCell>{result.doc_type || result.document?.name || '—'}</TableCell>
                     </TableRow>
-                    {result.document.institute_name && (
+                    {(result.institute_name || result.document?.institute_name) && (
                       <TableRow>
                         <TableCell className="text-muted-foreground font-medium">Issued By</TableCell>
-                        <TableCell className="font-medium text-primary">{result.document.institute_name}</TableCell>
+                        <TableCell className="font-medium text-primary">{result.institute_name || result.document?.institute_name}</TableCell>
                       </TableRow>
                     )}
-                    {result.document.student_name && (
+                    {(result.student_name || result.document?.student_name) && (
                       <TableRow>
                         <TableCell className="text-muted-foreground font-medium">Student Name</TableCell>
-                        <TableCell>{result.document.student_name}</TableCell>
+                        <TableCell>{result.student_name || result.document?.student_name}</TableCell>
                       </TableRow>
                     )}
-                    {result.document.student_roll && (
+                    {(result.student_roll || result.document?.student_roll) && (
                       <TableRow>
                         <TableCell className="text-muted-foreground font-medium">Roll No</TableCell>
-                        <TableCell>{result.document.student_roll}</TableCell>
+                        <TableCell>{result.student_roll || result.document?.student_roll}</TableCell>
                       </TableRow>
                     )}
                     <TableRow>
                       <TableCell className="text-muted-foreground font-medium">Issue Date</TableCell>
-                      <TableCell>{new Date(result.document.issue_date).toLocaleDateString()}</TableCell>
+                      <TableCell>{new Date(result.date_issued || result.document?.issue_date).toLocaleDateString()}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -186,7 +186,7 @@ export default function VerificationResult({ backPath = "/verify" }: Props) {
                 </div>
 
                 <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-                  <p className="text-red-400 font-medium">Error: {result.error?.message}</p>
+                  <p className="text-red-400 font-medium">Error: {result.error?.message || 'Document details not found'}</p>
                   {result.error?.code && (
                     <p className="text-sm text-red-300 mt-1">Error Code: {result.error.code}</p>
                   )}

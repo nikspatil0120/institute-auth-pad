@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,9 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Upload, ArrowLeft, GraduationCap, Award, FileSpreadsheet, Scan } from "lucide-react";
+import { FileText, Upload, ArrowLeft, GraduationCap, Award, FileSpreadsheet, Scan, Shield } from "lucide-react";
 import OCRProcessor from "@/components/OCRProcessor";
+import FraudDetectionAlert from "@/components/FraudDetectionAlert";
+import FraudAnalysisModal from "@/components/FraudAnalysisModal";
 import { ParsedData } from "@/services/ocrService";
+import fraudDetectionService, { FraudAnalysis } from "@/services/fraudDetectionService";
 
 interface Institute {
   id: number;
@@ -26,6 +29,14 @@ export default function LegacyDocumentRequest() {
   const [loading, setLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [showOCR, setShowOCR] = useState(false);
+  const [fraudAnalysis, setFraudAnalysis] = useState<FraudAnalysis | null>(null);
+  const [showFraudAnalysis, setShowFraudAnalysis] = useState(false);
+  const [isAnalyzingFraud, setIsAnalyzingFraud] = useState(false);
+  const [uinValidation, setUinValidation] = useState<{
+    isValid: boolean;
+    message: string;
+    isChecking: boolean;
+  }>({ isValid: true, message: '', isChecking: false });
 
   const [formData, setFormData] = useState({
     studentName: "",
@@ -54,6 +65,47 @@ export default function LegacyDocumentRequest() {
     }
   };
 
+  const checkUINExists = async (uin: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/legacy/check-uin/${uin}`);
+      if (!res.ok) return false;
+      const data = await res.json();
+      return Boolean(data?.exists);
+    } catch (error) {
+      console.error('Error checking UIN:', error);
+      return false;
+    }
+  };
+
+  // Debounced UIN uniqueness validation
+  useEffect(() => {
+    let timer: number | undefined;
+    const uin = formData.uin?.trim();
+    if (!uin) {
+      setUinValidation({ isValid: true, message: '', isChecking: false });
+      return;
+    }
+    setUinValidation(prev => ({ ...prev, isChecking: true }));
+    // debounce 400ms
+    // @ts-ignore - window.setTimeout typing vs Node
+    timer = setTimeout(async () => {
+      const exists = await checkUINExists(uin);
+      if (exists) {
+        setUinValidation({
+          isValid: false,
+          message: `A document with UIN ${uin} already exists. Each UIN can only have one document.`,
+          isChecking: false,
+        });
+      } else {
+        setUinValidation({ isValid: true, message: '', isChecking: false });
+      }
+    }, 400);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [formData.uin]);
+
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -78,15 +130,17 @@ export default function LegacyDocumentRequest() {
     setDragOver(false);
     
     const files = Array.from(e.dataTransfer.files);
-    const pdfFile = files.find(file => file.type === 'application/pdf');
+    const validFile = files.find(file => 
+      file.type === 'application/pdf' || file.type.startsWith('image/')
+    );
     
-    if (pdfFile) {
-      handleFileChange(pdfFile);
+    if (validFile) {
+      handleFileChange(validFile);
     } else {
       toast({
         variant: "destructive",
         title: "Invalid File",
-        description: "Please drop a valid PDF file."
+        description: "Please drop a valid PDF or image file."
       });
     }
   };
@@ -157,10 +211,73 @@ export default function LegacyDocumentRequest() {
       const data = await res.json();
 
       if (res.ok) {
-        toast({
-          title: "Request Submitted",
-          description: "Your legacy document verification request has been submitted successfully."
-        });
+        // Perform fraud detection on the uploaded document (only for image files)
+        try {
+          setIsAnalyzingFraud(true);
+          
+          // Fraud detection now works on both PDF and image files
+          if (formData.document) {
+            const extractedData: ParsedData = {
+              studentName: formData.studentName,
+              studentRoll: formData.studentRoll,
+              certificateNumber: formData.uin,
+              institutionName: institutes.find(inst => inst.id.toString() === formData.instituteId)?.name || '',
+              courseName: formData.docType,
+              marks: formData.marks,
+              dateIssued: formData.dateIssued,
+              uin: formData.uin
+            };
+
+            const fraudResult = await fraudDetectionService.detectFraud(formData.document!, extractedData);
+            setFraudAnalysis(fraudResult);
+
+            // Save fraud analysis to database
+            try {
+              await fetch(`${API_BASE_URL}/legacy/requests/${data.request_id}/fraud-analysis`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  fraud_risk: fraudResult.risk_level,
+                  fraud_score: fraudResult.fraud_probability,
+                  fraud_analysis: JSON.stringify(fraudResult),
+                  requires_manual_review: fraudResult.risk_level === 'HIGH' || fraudResult.risk_level === 'MEDIUM'
+                })
+              });
+            } catch (error) {
+              console.error('Failed to save fraud analysis:', error);
+            }
+
+            // Show appropriate toast based on risk level
+            if (fraudResult.risk_level === 'HIGH') {
+              toast({
+                variant: "destructive",
+                title: "High Fraud Risk Detected",
+                description: `Document shows HIGH fraud risk. Please review the analysis carefully.`
+              });
+            } else if (fraudResult.risk_level === 'MEDIUM') {
+              toast({
+                variant: "destructive",
+                title: "Medium Fraud Risk Detected",
+                description: `Document shows MEDIUM fraud risk. Please review the analysis.`
+              });
+            } else {
+              toast({
+                title: "Request Submitted Successfully",
+                description: `Document shows LOW fraud risk. Your legacy document verification request has been submitted.`
+              });
+            }
+          }
+        } catch (fraudError) {
+          console.error('Fraud detection failed:', fraudError);
+          toast({
+            title: "Request Submitted",
+            description: "Your legacy document verification request has been submitted successfully. (Fraud analysis unavailable)"
+          });
+        } finally {
+          setIsAnalyzingFraud(false);
+        }
         
         // Reset form
         setFormData({
@@ -173,8 +290,20 @@ export default function LegacyDocumentRequest() {
           instituteId: "",
           document: null
         });
+        // Don't clear fraud analysis - let user see the results
       } else {
-        throw new Error(data.error || 'Failed to submit request');
+        // Handle specific error cases
+        if (res.status === 409) {
+          // UIN already exists
+          const existingDoc = data.existing_document;
+          toast({
+            variant: "destructive",
+            title: "UIN Already Exists",
+            description: `A document with UIN ${formData.uin} already exists for student ${existingDoc?.student_name || 'Unknown'}. Each UIN can only have one document.`
+          });
+        } else {
+          throw new Error(data.error || 'Failed to submit request');
+        }
       }
     } catch (error: any) {
       toast({
@@ -316,6 +445,12 @@ export default function LegacyDocumentRequest() {
                     className="bg-input border-border/50 focus:border-primary/50"
                     required
                   />
+                  {!uinValidation.isValid && (
+                    <p className="text-sm text-destructive">{uinValidation.message}</p>
+                  )}
+                  {uinValidation.isChecking && (
+                    <p className="text-sm text-muted-foreground">Checking UIN availability...</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="dateIssued">Date Issued *</Label>
@@ -387,13 +522,13 @@ export default function LegacyDocumentRequest() {
                     </div>
                   ) : (
                     <div>
-                      <p className="text-lg font-medium mb-2">Drop PDF file here</p>
+                      <p className="text-lg font-medium mb-2">Drop PDF or image file here</p>
                       <p className="text-sm text-muted-foreground mb-4">
                         or click to browse files
                       </p>
                       <input
                         type="file"
-                        accept=".pdf"
+                        accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp,.tiff"
                         onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
                         className="hidden"
                         id="document-upload"
@@ -411,10 +546,15 @@ export default function LegacyDocumentRequest() {
               {/* Submit Button */}
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || isAnalyzingFraud || !uinValidation.isValid || uinValidation.isChecking}
                 className="w-full bg-gradient-primary hover:shadow-glow transition-all duration-300"
               >
-                {loading ? (
+                {isAnalyzingFraud ? (
+                  <>
+                    <Shield className="h-4 w-4 mr-2 animate-pulse" />
+                    Analyzing for Fraud...
+                  </>
+                ) : loading ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     Submitting Request...
@@ -429,6 +569,24 @@ export default function LegacyDocumentRequest() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Fraud Detection Alert */}
+        {fraudAnalysis && (
+          <div className="max-w-4xl mx-auto">
+            <FraudDetectionAlert
+              fraudAnalysis={fraudAnalysis}
+              onViewDetails={() => setShowFraudAnalysis(true)}
+              onReportFraud={() => {
+                // Handle fraud reporting
+                toast({
+                  title: "Fraud Report",
+                  description: "Fraud reporting functionality will be implemented."
+                });
+              }}
+              onClearAnalysis={() => setFraudAnalysis(null)}
+            />
+          </div>
+        )}
 
         {/* OCR Modal */}
         {showOCR && (
@@ -451,6 +609,22 @@ export default function LegacyDocumentRequest() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Fraud Analysis Modal */}
+        {fraudAnalysis && (
+          <FraudAnalysisModal
+            isOpen={showFraudAnalysis}
+            onClose={() => setShowFraudAnalysis(false)}
+            fraudAnalysis={fraudAnalysis}
+            onReportFraud={() => {
+              // Handle fraud reporting
+              toast({
+                title: "Fraud Report",
+                description: "Fraud reporting functionality will be implemented."
+              });
+            }}
+          />
         )}
 
       </div>

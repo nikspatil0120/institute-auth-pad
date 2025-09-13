@@ -39,6 +39,26 @@ def get_current_institute():
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, Exception):
         return None
 
+@legacy_documents_bp.route('/legacy/check-uin/<uin>', methods=['GET'])
+def check_uin_exists(uin):
+    """Check if a UIN already exists"""
+    try:
+        existing_doc = LegacyDocument.query.filter_by(uin=uin).first()
+        if existing_doc:
+            return jsonify({
+                'exists': True,
+                'document': {
+                    'id': existing_doc.id,
+                    'student_name': existing_doc.student_name,
+                    'status': existing_doc.status,
+                    'date_created': existing_doc.created_at.isoformat() if existing_doc.created_at else None
+                }
+            }), 200
+        else:
+            return jsonify({'exists': False}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @legacy_documents_bp.route('/legacy/request', methods=['POST'])
 def create_legacy_request():
     """Create a new legacy document verification request"""
@@ -76,6 +96,19 @@ def create_legacy_request():
         except ValueError:
             return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
         
+        # Check if UIN already exists
+        existing_doc = LegacyDocument.query.filter_by(uin=data['uin']).first()
+        if existing_doc:
+            return jsonify({
+                'error': f'A document with UIN {data["uin"]} already exists. Each UIN can only have one document.',
+                'existing_document': {
+                    'id': existing_doc.id,
+                    'student_name': existing_doc.student_name,
+                    'status': existing_doc.status,
+                    'date_created': existing_doc.created_at.isoformat() if existing_doc.created_at else None
+                }
+            }), 409  # Conflict status code
+        
         # Save uploaded file
         filename = secure_filename(file.filename)
         unique_filename = f"legacy_{uuid.uuid4().hex}_{filename}"
@@ -84,7 +117,7 @@ def create_legacy_request():
         
         # Create legacy document record
         legacy_doc = LegacyDocument(
-            institute_id=institute.id,
+            institute_id=institute.id,  # Associated with the institute that creates it
             student_name=data['student_name'],
             student_roll=data['student_roll'],
             doc_type=data['doc_type'],
@@ -117,6 +150,7 @@ def get_legacy_requests():
         if not institute:
             return jsonify({'error': 'Authentication required'}), 401
         
+        # Show only documents created by this institute
         requests = LegacyDocument.query.filter_by(institute_id=institute.id).order_by(LegacyDocument.created_at.desc()).all()
         
         return jsonify({
@@ -124,6 +158,65 @@ def get_legacy_requests():
         }), 200
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@legacy_documents_bp.route('/legacy/requests/<int:request_id>/fraud-analysis', methods=['PUT'])
+def update_fraud_analysis(request_id):
+    """Update fraud analysis for a legacy document"""
+    try:
+        data = request.get_json()
+        
+        # Get the document
+        document = LegacyDocument.query.get(request_id)
+        if not document:
+            return jsonify({'error': 'Document not found'}), 404
+        
+        # Update fraud analysis fields
+        document.fraud_risk = data.get('fraud_risk')
+        document.fraud_score = data.get('fraud_score')
+        document.fraud_analysis = data.get('fraud_analysis')
+        document.requires_manual_review = data.get('requires_manual_review', False)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Fraud analysis updated successfully',
+            'fraud_risk': document.fraud_risk,
+            'fraud_score': document.fraud_score
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@legacy_documents_bp.route('/legacy/requests/<int:request_id>', methods=['DELETE'])
+def delete_legacy_document(request_id):
+    """Delete a legacy document request"""
+    try:
+        institute = get_current_institute()
+        if not institute:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        # Get the document
+        document = LegacyDocument.query.filter_by(id=request_id).first()
+        if not document:
+            return jsonify({'error': 'Document not found'}), 404
+        
+        # Delete the file if it exists
+        if document.file_path and os.path.exists(document.file_path):
+            try:
+                os.remove(document.file_path)
+            except Exception as e:
+                print(f"Warning: Could not delete file {document.file_path}: {e}")
+        
+        # Delete the document from database
+        db.session.delete(document)
+        db.session.commit()
+        
+        return jsonify({'message': 'Document deleted successfully'}), 200
+        
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @legacy_documents_bp.route('/legacy/requests/<int:request_id>/status', methods=['PUT'])
@@ -141,7 +234,7 @@ def update_legacy_status(request_id):
             return jsonify({'error': 'Invalid status. Must be unverified or verified'}), 400
         
         request_id = request.view_args['request_id']
-        legacy_doc = LegacyDocument.query.filter_by(id=request_id, institute_id=institute.id).first()
+        legacy_doc = LegacyDocument.query.filter_by(id=request_id).first()
         
         if not legacy_doc:
             return jsonify({'error': 'Legacy document request not found'}), 404
@@ -228,7 +321,8 @@ def search_legacy_document():
             return jsonify({'error': 'Legacy document not found'}), 404
         
         return jsonify({
-            'document': legacy_doc.to_dict()
+            'documents': [legacy_doc.to_dict()],
+            'count': 1
         }), 200
         
     except Exception as e:

@@ -19,6 +19,11 @@ class LegacyDocument(db.Model):
     cert_id = db.Column(db.String(100), nullable=True)  # Only set when verified
     verified_at = db.Column(db.DateTime, nullable=True)
     verified_by = db.Column(db.String(255), nullable=True)  # Institute name that verified
+    # Fraud detection fields
+    fraud_risk = db.Column(db.String(20), nullable=True)  # "LOW" | "MEDIUM" | "HIGH"
+    fraud_score = db.Column(db.Float, nullable=True)  # 0.0 to 1.0
+    fraud_analysis = db.Column(db.Text, nullable=True)  # JSON string of analysis details
+    requires_manual_review = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -39,6 +44,10 @@ class LegacyDocument(db.Model):
             'cert_id': self.cert_id,
             'verified_at': self.verified_at.isoformat() if self.verified_at else None,
             'verified_by': self.verified_by,
+            'fraud_risk': self.fraud_risk,
+            'fraud_score': self.fraud_score,
+            'fraud_analysis': self.fraud_analysis,
+            'requires_manual_review': self.requires_manual_review,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

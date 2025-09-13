@@ -1,73 +1,101 @@
-# Welcome to your Lovable project
+# Institute Authentication Platform
 
-## Project info
+## Project Overview
 
-**URL**: https://lovable.dev/projects/02293c6d-3aff-4280-836b-a10516a7b935
+This is an Institute Authentication Platform built with modern web technologies for secure document management, certificate issuance, and verification.
 
-## How can I edit this code?
+## How to run this project locally
 
-There are several ways of editing your application.
+**Prerequisites**
 
-**Use Lovable**
+Make sure you have Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/02293c6d-3aff-4280-836b-a10516a7b935) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+**Setup Steps**
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Step 1: Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Step 2: Navigate to the project directory
+cd institute-auth-pad
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Step 3: Install the necessary dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 4: Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+**Backend Setup**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```sh
+# Navigate to backend directory
+cd backend
 
-**Use GitHub Codespaces**
+# Install Python dependencies
+pip install -r requirements.txt
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# Run the Flask application
+python app.py
+```
 
 ## What technologies are used for this project?
 
 This project is built with:
 
+**Frontend:**
 - Vite
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+- React Router
 
-## How can I deploy this project?
+**Backend:**
+- Python Flask
+- SQLAlchemy
+- Blockchain integration
+- OCR processing
+- Fraud detection
 
-Simply open [Lovable](https://lovable.dev/projects/02293c6d-3aff-4280-836b-a10516a7b935) and click on Share -> Publish.
+## Features
 
-## Can I connect a custom domain to my Lovable project?
+- **Document Management**: Upload, process, and manage student documents
+- **Certificate Issuance**: Issue digital certificates with blockchain verification
+- **Document Verification**: Verify document authenticity using blockchain
+- **OCR Processing**: Extract text from uploaded documents
+- **Fraud Detection**: AI-powered fraud detection for documents
+- **Legacy Document Support**: Handle legacy document formats
+- **Admin Dashboard**: Comprehensive admin interface for institute management
 
-Yes, you can!
+## Project Structure
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```
+├── src/                    # Frontend React application
+│   ├── components/         # Reusable UI components
+│   ├── pages/             # Application pages
+│   ├── services/          # API services
+│   └── lib/               # Utility functions
+├── backend/               # Python Flask backend
+│   ├── models/            # Database models
+│   ├── routes/            # API routes
+│   ├── services/          # Business logic
+│   └── utils/             # Utility functions
+└── public/                # Static assets
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## Development
+
+- **Frontend**: Runs on `http://localhost:8080`
+- **Backend**: Runs on `http://localhost:5000`
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## License
+
+This project is licensed under the MIT License.

@@ -85,7 +85,7 @@ def reset_ledger() -> bool:
         print(f"Error resetting ledger: {str(e)}")
         return False
 
-def verify_document(doc_id=None, uploaded_file=None, cert_id: str | None = None):
+def verify_document(doc_id=None, uploaded_file=None, cert_id: str | None = None, current_institute=None):
     """
     Verify document against ledger and database
     
@@ -104,6 +104,17 @@ def verify_document(doc_id=None, uploaded_file=None, cert_id: str | None = None)
             document: Document | None = Document.query.filter_by(number=cert_id).first()
             if document:
                 return verify_document(doc_id=document.id)
+
+            # Check legacy documents by cert_id
+            from models.legacy_document import LegacyDocument
+            legacy_doc: LegacyDocument | None = LegacyDocument.query.filter_by(cert_id=cert_id).first()
+            if legacy_doc:
+                return verify_legacy_document(legacy_doc, current_institute)
+
+            # Check legacy documents by UIN
+            legacy_doc_uin: LegacyDocument | None = LegacyDocument.query.filter_by(uin=cert_id).first()
+            if legacy_doc_uin:
+                return verify_legacy_document(legacy_doc_uin, current_institute)
 
             # Fallback: compute deterministic cert_id for each document and match
             candidate: Document | None = None
@@ -310,6 +321,75 @@ def verify_document(doc_id=None, uploaded_file=None, cert_id: str | None = None)
                 }
             }
             
+    except Exception as e:
+        return {
+            'status': 'invalid',
+            'error': {
+                'code': 'VERIFICATION_ERROR',
+                'message': str(e)
+            }
+        }
+
+def verify_legacy_document(legacy_doc, current_institute=None):
+    """
+    Verify a legacy document
+    
+    Args:
+        legacy_doc: LegacyDocument object
+        current_institute: Current institute requesting verification
+        
+    Returns:
+        dict: Verification result
+    """
+    try:
+        # Check if current institute has permission to verify this document
+        if current_institute and legacy_doc.institute_id != current_institute.id:
+            return {
+                'status': 'invalid',
+                'error': {
+                    'code': 'PERMISSION_DENIED',
+                    'message': 'Only the institute that created this document can verify it'
+                }
+            }
+        
+        # Check if document is verified
+        if legacy_doc.status != 'verified':
+            return {
+                'status': 'invalid',
+                'error': {
+                    'code': 'DOCUMENT_NOT_VERIFIED',
+                    'message': 'Document is not verified by institute'
+                }
+            }
+        
+        # Get institute name
+        institute_name = "Unknown Institute"
+        try:
+            from models.institute import Institute
+            if legacy_doc.institute_id:
+                institute = Institute.query.get(legacy_doc.institute_id)
+                if institute:
+                    institute_name = institute.name
+        except Exception:
+            pass
+        
+        # Return verification result
+        return {
+            'status': 'valid',
+            'document_id': legacy_doc.id,
+            'certificate_id': legacy_doc.cert_id,
+            'student_name': legacy_doc.student_name,
+            'student_roll': legacy_doc.student_roll,
+            'uin': legacy_doc.uin,
+            'doc_type': legacy_doc.doc_type,
+            'institute_name': institute_name,
+            'date_issued': legacy_doc.date_issued.isoformat() if legacy_doc.date_issued else None,
+            'verified_at': legacy_doc.verified_at.isoformat() if legacy_doc.verified_at else None,
+            'verified_by': legacy_doc.verified_by,
+            'blockchain_hash': legacy_doc.blockchain_hash,
+            'marks': legacy_doc.marks
+        }
+        
     except Exception as e:
         return {
             'status': 'invalid',
