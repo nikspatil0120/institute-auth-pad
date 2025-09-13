@@ -1,11 +1,164 @@
+# Core Flask Framework
 Flask==2.3.3
 Flask-SQLAlchemy==3.0.5
 Flask-Migrate==4.0.5
 Flask-CORS==4.0.0
+Flask-Login==0.6.3
 Werkzeug==2.3.7
+
+# Database
+SQLAlchemy==2.0.36
+alembic==1.16.5
+psycopg2==2.9.10
+
+# Authentication & Security
 PyJWT==2.8.0
-ReportLab==4.0.4
+itsdangerous==2.2.0
+
+# PDF Processing
 PyPDF2==3.0.1
+PyMuPDF==1.26.4
+pdf2image==1.17.0
+reportlab==4.0.4
+
+# Image Processing & OCR
+Pillow==11.2.1
+opencv-python==4.12.0.88
+pytesseract==0.3.13
+pypng==0.20220715.0
+
+# QR Code Generation
 qrcode==7.4.2
-Pillow>=10.4.0
+
+# Data Processing & Analysis
+numpy==2.2.5
+pandas==2.3.0
+scikit-learn==1.7.0
+scipy==1.15.3
+matplotlib==3.10.1
+seaborn==0.13.2
+
+# Utilities
 python-dateutil==2.8.2
+python-dotenv==1.1.0
+requests==2.32.3
+click==8.1.8
+colorama==0.4.6
+certifi==2025.6.15
+charset-normalizer==3.4.2
+idna==3.10
+urllib3==2.2.3
+
+# Template Engine
+Jinja2==3.1.6
+MarkupSafe==3.0.2
+Mako==1.3.10
+
+# Configuration & Environment
+python-dotenv==1.1.0
+PyYAML==6.0.2
+
+# HTTP & Networking
+httpx==0.28.1
+httpcore==1.0.9
+h11==0.16.0
+sniffio==1.3.1
+
+# JSON & Schema Validation
+jsonschema==4.24.0
+jsonschema-specifications==2025.4.1
+referencing==0.36.2
+rfc3339-validator==0.1.4
+rfc3986-validator==0.1.1
+rpds-py==0.25.1
+
+# Date & Time
+pytz==2025.2
+arrow==1.3.0
+isoduration==20.11.0
+
+# Text Processing
+beautifulsoup4==4.13.4
+bleach==6.2.0
+defusedxml==0.7.1
+soupsieve==2.7
+
+# Async & Concurrency
+anyio==4.9.0
+async-lru==2.0.5
+nest-asyncio==1.6.0
+greenlet==3.1.1
+
+# Development & Debugging
+debugpy==1.8.14
+ipython==9.3.0
+jedi==0.19.2
+parso==0.8.4
+prompt_toolkit==3.0.51
+Pygments==2.19.1
+stack-data==0.6.3
+executing==2.2.0
+pure_eval==0.2.3
+asttokens==3.0.0
+
+# Jupyter & Notebook (if used for development)
+jupyter==1.1.1
+jupyter-client==8.6.3
+jupyter-core==5.8.1
+jupyter-server==2.16.0
+jupyterlab==4.4.3
+notebook==7.4.3
+ipykernel==6.29.5
+nbconvert==7.16.6
+nbformat==5.10.4
+nbclient==0.10.2
+
+# System & Platform
+psutil==6.1.0
+platformdirs==4.3.8
+pywin32==310
+pywinpty==2.0.15
+
+# Logging
+python-json-logger==3.3.0
+
+# Packaging & Build
+setuptools==80.9.0
+packaging==25.0
+wheel==0.45.1
+
+# C Extensions
+cffi==1.17.1
+pycparser==2.22
+
+# Additional Dependencies
+six==1.17.0
+attrs==25.3.0
+decorator==5.2.1
+joblib==1.5.1
+networkx==3.4.2
+contourpy==1.3.2
+cycler==0.12.1
+fonttools==4.57.0
+kiwisolver==1.4.8
+pyparsing==3.2.3
+matplotlib-inline==0.1.7
+mistune==3.1.3
+jupyter-events==0.12.0
+jupyter-lsp==2.2.5
+jupyterlab-pygments==0.3.0
+jupyterlab-server==2.27.3
+notebook-shim==0.2.4
+jupyter-server-terminals==0.5.3
+terminado==0.18.1
+Send2Trash==1.8.3
+prometheus-client==0.22.1
+pyzmq==27.0.0
+comm==0.2.2
+overrides==7.7.0
+fastjsonschema==2.21.1
+json5==0.12.0
+jsonpointer==3.0.0
+pandocfilters==1.5.1
+babel==2.17.0
+fqdn==1.5.1
