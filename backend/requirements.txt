@@ -124,7 +124,7 @@ python-json-logger==3.3.0
 
 # Packaging & Build
 setuptools==80.9.0
-packaging==25.0
+packaging==24.0
 wheel==0.45.1
 
 # C Extensions

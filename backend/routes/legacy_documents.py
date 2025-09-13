@@ -5,6 +5,7 @@ from models.institute import Institute
 from blockchain.ledger import add_to_ledger
 from utils.pdf_tools import generate_blockchain_hash
 from utils.pdf_tools import add_watermark_and_qr
+from routes.auth import get_current_institute
 from werkzeug.utils import secure_filename
 import os
 import uuid
@@ -16,28 +17,6 @@ import jwt
 
 legacy_documents_bp = Blueprint('legacy_documents', __name__)
 
-def get_current_institute():
-    """Get current institute from JWT token"""
-    try:
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
-            return None
-        
-        token = auth_header.split(' ')[1]
-        
-        # Decode JWT token
-        payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
-        institute_id = payload.get('institute_id')
-        
-        if not institute_id:
-            return None
-        
-        # Get institute from database
-        institute = Institute.query.get(institute_id)
-        return institute
-        
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, Exception):
-        return None
 
 @legacy_documents_bp.route('/legacy/check-uin/<uin>', methods=['GET'])
 def check_uin_exists(uin):

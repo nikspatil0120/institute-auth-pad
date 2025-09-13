@@ -101,6 +101,19 @@ def verify_admin_token(token):
     except:
         return None
 
+def get_current_institute():
+    """Get current institute from JWT token"""
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return None
+    
+    token = auth_header.split(' ')[1]
+    institute_id = verify_token(token)
+    if not institute_id:
+        return None
+    
+    return Institute.query.get(institute_id)
+
 # Admin authentication endpoints
 @auth_bp.route('/admin/login', methods=['POST'])
 def admin_login():

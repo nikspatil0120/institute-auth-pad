@@ -8,6 +8,29 @@ from reportlab.lib.utils import ImageReader
 from PyPDF2 import PdfReader, PdfWriter, Transformation
 import qrcode
 from io import BytesIO
+from PIL import Image
+
+def convert_image_to_pdf(image_path, output_pdf_path):
+    """
+    Convert image file to PDF
+    
+    Args:
+        image_path: Path to input image
+        output_pdf_path: Path to output PDF
+    """
+    try:
+        # Open image
+        with Image.open(image_path) as img:
+            # Convert to RGB if necessary (for JPEG compatibility)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Save as PDF
+            img.save(output_pdf_path, 'PDF', resolution=300.0)
+        return True
+    except Exception as e:
+        print(f"Error converting image to PDF: {e}")
+        return False
 
 def add_watermark_and_qr(input_pdf_path, output_pdf_path, watermark_text, qr_data, header_left: str | None = None, header_right: str | None = None):
     """
@@ -52,6 +75,9 @@ def add_watermark_and_qr(input_pdf_path, output_pdf_path, watermark_text, qr_dat
             page_width = float(page.mediabox.width)
             page_height = float(page.mediabox.height)
             
+            # Detect if page is in portrait orientation
+            is_portrait = page_height > page_width
+            
             # We will extend the page later with a header banner; skip drawing header on this overlay
 
             # Add diagonal watermark
@@ -86,8 +112,9 @@ def add_watermark_and_qr(input_pdf_path, output_pdf_path, watermark_text, qr_dat
             # Merge overlay onto content page
             page.merge_page(watermark_page)
 
-            # Create a new page with extra header space and draw the header there (slightly smaller)
-            header_height = 22
+            # Create a new page with extra header space and draw the header there
+            # Use smaller header height for portrait orientation
+            header_height = 18 if is_portrait else 22
             top_packet = BytesIO()
             top_can = canvas.Canvas(top_packet, pagesize=(page_width, page_height + header_height))
             # Banner background
@@ -96,14 +123,17 @@ def add_watermark_and_qr(input_pdf_path, output_pdf_path, watermark_text, qr_dat
             top_can.setStrokeColor(Color(0.8, 0.8, 0.8, 1))
             top_can.setLineWidth(0.5)
             top_can.line(0, page_height, page_width, page_height)
-            # Header text
+            # Header text - use smaller font for portrait orientation
             top_can.setFillColor(Color(0.15, 0.15, 0.15, 1))
-            top_can.setFont("Helvetica-Bold", 9.5)
+            font_size = 7.5 if is_portrait else 9.5  # Smaller font for portrait
+            top_can.setFont("Helvetica-Bold", font_size)
+            # Adjust vertical position for portrait orientation
+            text_y = page_height + 5 if is_portrait else page_height + 7
             if header_left:
-                top_can.drawString(12, page_height + 7, header_left)
+                top_can.drawString(12, text_y, header_left)
             if header_right:
-                right_text_width = top_can.stringWidth(header_right, "Helvetica-Bold", 9.5)
-                top_can.drawString(page_width - 12 - right_text_width, page_height + 7, header_right)
+                right_text_width = top_can.stringWidth(header_right, "Helvetica-Bold", font_size)
+                top_can.drawString(page_width - 12 - right_text_width, text_y, header_right)
             top_can.save()
 
             top_packet.seek(0)

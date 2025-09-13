@@ -6,25 +6,13 @@ from models.document import Document
 from models.institute import Institute
 from database import db
 from sqlalchemy import func
-from utils.pdf_tools import add_watermark_and_qr, generate_blockchain_hash
+from utils.pdf_tools import add_watermark_and_qr, generate_blockchain_hash, convert_image_to_pdf
 from blockchain.ledger import add_to_ledger, verify_document, remove_doc_from_ledger, reset_ledger, load_ledger
-from routes.auth import verify_token
+from routes.auth import verify_token, get_current_institute
 import json
 
 documents_bp = Blueprint('documents', __name__)
 
-def get_current_institute():
-    """Get current institute from JWT token"""
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        return None
-    
-    token = auth_header.split(' ')[1]
-    institute_id = verify_token(token)
-    if not institute_id:
-        return None
-    
-    return Institute.query.get(institute_id)
 
 @documents_bp.route('/upload_document', methods=['POST'])
 def upload_document():
@@ -45,8 +33,11 @@ def upload_document():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
         
-        if not file.filename.lower().endswith('.pdf'):
-            return jsonify({'error': 'Only PDF files are allowed'}), 400
+        # Check file extension - allow both PDF and image files
+        allowed_extensions = {'.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.tiff'}
+        file_extension = os.path.splitext(file.filename.lower())[1]
+        if file_extension not in allowed_extensions:
+            return jsonify({'error': 'Only PDF and image files (PNG, JPG, JPEG, GIF, BMP, WEBP, TIFF) are allowed'}), 400
         
         # Get form data based on document type
         name = request.form.get('name', '')
@@ -73,6 +64,14 @@ def upload_document():
         filename = secure_filename(file.filename)
         temp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], f"temp_{datetime.now().timestamp()}_{filename}")
         file.save(temp_path)
+        
+        # Convert image files to PDF for processing
+        if file_extension in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.tiff']:
+            pdf_path = temp_path.replace(file_extension, '.pdf')
+            if not convert_image_to_pdf(temp_path, pdf_path):
+                return jsonify({'error': 'Failed to convert image to PDF'}), 500
+            # Update temp_path to use the converted PDF
+            temp_path = pdf_path
         
         # Prepare a consistent fingerprint for Certificate ID used across system
         cert_fingerprint_all = {
@@ -420,7 +419,6 @@ def delete_document(doc_id):
 def verify_document_endpoint():
     try:
         # Get current institute for permission checking
-        from routes.auth import get_current_institute
         current_institute = get_current_institute()
         
         # Handle both JSON and form data
